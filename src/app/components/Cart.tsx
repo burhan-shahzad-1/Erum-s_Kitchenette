@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { Separator } from './ui/separator';
 
 export function Cart() {

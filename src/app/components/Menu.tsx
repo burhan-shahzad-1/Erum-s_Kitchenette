@@ -8,7 +8,7 @@ import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { toast } from 'sonner';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { EmptyState } from './LoadingSpinner';
 import {
   Select,

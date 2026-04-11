@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Star, Clock, ShieldCheck, Heart, Sparkles, TrendingUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 
 const features = [
   {

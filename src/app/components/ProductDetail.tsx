@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Star, ShoppingCart, Heart, Share2, Leaf, Clock, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 import { useCart } from '../context/CartContext';
 import { toast } from 'sonner';
 import { useState } from 'react';

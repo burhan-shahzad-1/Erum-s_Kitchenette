@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import { Heart, Award, Users, Clock, ChefHat, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
-import { ImageWithFallback } from './figma/ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
 
 const values = [
   {
