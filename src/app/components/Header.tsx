@@ -55,7 +55,7 @@ export function Header() {
               <ChefHat className="w-6 h-6 text-white" />
             </motion.div>
             <span className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent hidden sm:inline">
-              Erum's Kitchette
+              Erum's Kitchnette
             </span>
           </Link>
 

@@ -118,7 +118,7 @@ export function Home() {
               <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-gray-900 dark:text-gray-100 leading-tight mb-6">
                 <span className="block mb-2">Welcome to</span>
                 <span className="bg-gradient-to-r from-orange-600 via-red-500 to-pink-600 bg-clip-text text-transparent drop-shadow-sm">
-                  Erum's Kitchette
+                  Erum's Kitchnette
                 </span>
               </h1>
               

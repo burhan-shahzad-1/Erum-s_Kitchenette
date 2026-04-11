@@ -13,7 +13,7 @@ export function Footer() {
               <div className="bg-gradient-to-br from-orange-500 to-red-500 p-2 rounded-lg">
                 <ChefHat className="w-6 h-6 text-white" />
               </div>
-              <span className="text-lg font-semibold">Erum's Kitchette</span>
+              <span className="text-lg font-semibold">Erum's Kitchnette</span>
             </div>
 
             <p className="text-gray-400 text-sm">
@@ -127,7 +127,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2026 Erum's Kitchette. All rights reserved. Made with ❤️ for food lovers.</p>
+          <p>&copy; 2026 Erum's Kitchnette. All rights reserved. Made with ❤️ for food lovers.</p>
         </div>
 
       </div>
