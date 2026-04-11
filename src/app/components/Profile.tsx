@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { EditProfileDialog } from './EditProfileDialog';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import {
@@ -87,15 +87,22 @@ export function Profile() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Please login to view your profile</h2>
-          <Button
-            onClick={() => navigate('/')}
-            className="bg-gradient-to-r from-orange-600 to-red-600 text-white"
-          >
-            Go to Home
-          </Button>
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">
+            Sign in to view your profile
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Access orders, favorites, and account settings after you sign in.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
+              <Link to="/login">Sign in</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/signup">Create account</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );

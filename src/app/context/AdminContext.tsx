@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { ADMIN_CREDENTIALS, normalizeEmail, STORAGE_KEYS } from '../lib/authConfig';
 
 interface Product {
   id: string;
@@ -173,7 +174,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   // Check authentication on mount
   useEffect(() => {
-    const adminAuth = localStorage.getItem('adminAuthenticated');
+    const adminAuth = localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
     if (adminAuth === 'true') {
       setIsAdminAuthenticated(true);
     }
@@ -237,10 +238,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   };
 
   const loginAdmin = (email: string, password: string): boolean => {
-    // Simple mock authentication
-    if (email === 'admin@erumskitchette.com' && password === 'admin123') {
+    if (
+      normalizeEmail(email) === normalizeEmail(ADMIN_CREDENTIALS.email) &&
+      password === ADMIN_CREDENTIALS.password
+    ) {
       setIsAdminAuthenticated(true);
-      localStorage.setItem('adminAuthenticated', 'true');
+      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
       return true;
     }
     return false;
@@ -248,7 +251,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   const logoutAdmin = () => {
     setIsAdminAuthenticated(false);
-    localStorage.removeItem('adminAuthenticated');
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
   };
 
   return (

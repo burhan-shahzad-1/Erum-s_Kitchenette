@@ -7,17 +7,12 @@ import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll } from 'motion/react';
-import { LoginDialog } from './LoginDialog';
-import { SignupDialog } from './SignupDialog';
-
 export function Header() {
   const { totalItems } = useCart();
   const { user, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showLoginDialog, setShowLoginDialog] = useState(false);
-  const [showSignupDialog, setShowSignupDialog] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
 
@@ -156,18 +151,14 @@ export function Header() {
               </Link>
             ) : (
               <div className="hidden md:flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowLoginDialog(true)}
-                  className="text-gray-700 hover:text-orange-600"
-                >
-                  Login
+                <Button variant="ghost" asChild className="text-gray-700 hover:text-orange-600">
+                  <Link to="/login">Login</Link>
                 </Button>
                 <Button
-                  onClick={() => setShowSignupDialog(true)}
+                  asChild
                   className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
                 >
-                  Sign Up
+                  <Link to="/signup">Sign Up</Link>
                 </Button>
               </div>
             )}
@@ -229,22 +220,20 @@ export function Header() {
                 >
                   <Button
                     variant="ghost"
-                    onClick={() => {
-                      setShowLoginDialog(true);
-                      setMobileMenuOpen(false);
-                    }}
+                    asChild
                     className="w-full justify-start text-gray-700 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-gray-800"
                   >
-                    Login
+                    <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                      Login
+                    </Link>
                   </Button>
                   <Button
-                    onClick={() => {
-                      setShowSignupDialog(true);
-                      setMobileMenuOpen(false);
-                    }}
+                    asChild
                     className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    Sign Up
+                    <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
+                      Sign Up
+                    </Link>
                   </Button>
                 </motion.div>
               )}
@@ -253,23 +242,6 @@ export function Header() {
         )}
       </AnimatePresence>
 
-      <LoginDialog
-        isOpen={showLoginDialog}
-        onClose={() => setShowLoginDialog(false)}
-        onSwitchToSignup={() => {
-          setShowLoginDialog(false);
-          setShowSignupDialog(true);
-        }}
-      />
-
-      <SignupDialog
-        isOpen={showSignupDialog}
-        onClose={() => setShowSignupDialog(false)}
-        onSwitchToLogin={() => {
-          setShowSignupDialog(false);
-          setShowLoginDialog(true);
-        }}
-      />
     </motion.header>
   );
 }

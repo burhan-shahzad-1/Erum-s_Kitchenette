@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 
 interface ChangePasswordDialogProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface ChangePasswordDialogProps {
 }
 
 export function ChangePasswordDialog({ isOpen, onClose }: ChangePasswordDialogProps) {
+  const { changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,6 +23,15 @@ export function ChangePasswordDialog({ isOpen, onClose }: ChangePasswordDialogPr
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error('Passwords do not match!');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters.');
+      return;
+    }
+    const result = changePassword(currentPassword, newPassword);
+    if (!result.success) {
+      toast.error(result.error);
       return;
     }
     toast.success('Password changed successfully!');

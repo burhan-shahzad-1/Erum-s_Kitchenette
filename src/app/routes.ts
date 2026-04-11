@@ -13,6 +13,8 @@ import { Terms } from "./components/Terms";
 import { Privacy } from "./components/Privacy";
 import { OrderTracking } from "./components/OrderTracking";
 import { NotFound } from "./components/NotFound";
+import { LoginPage } from "./components/LoginPage";
+import { SignupPage } from "./components/SignupPage";
 import { AdminLogin } from "./components/admin/AdminLogin";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
@@ -39,6 +41,8 @@ export const router = createBrowserRouter([
       { path: "delivery", Component: DeliveryInfo },
       { path: "terms", Component: Terms },
       { path: "privacy", Component: Privacy },
+      { path: "login", Component: LoginPage },
+      { path: "signup", Component: SignupPage },
       { path: "*", Component: NotFound },
     ],
   },

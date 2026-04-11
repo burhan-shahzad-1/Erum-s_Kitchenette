@@ -22,7 +22,11 @@ export function EditProfileDialog({ isOpen, onClose }: EditProfileDialogProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUser({ name, email, phone, address });
+    const ok = updateUser({ name, email, phone, address });
+    if (!ok) {
+      toast.error('This email is already registered.');
+      return;
+    }
     toast.success('Profile updated successfully!');
     onClose();
   };

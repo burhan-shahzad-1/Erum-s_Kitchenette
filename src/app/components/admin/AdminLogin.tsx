@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { motion } from 'motion/react';
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -70,7 +70,7 @@ export function AdminLogin() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@erumskitchette.com"
+                    placeholder="burhanshahzad246@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
@@ -108,13 +108,13 @@ export function AdminLogin() {
               {/* Demo Credentials Info */}
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg p-4">
                 <p className="text-xs text-orange-800 dark:text-orange-300 font-medium mb-2">
-                  Demo Credentials:
+                  Admin sign-in (local demo):
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400 break-all">
+                  Email: burhanshahzad246@gmail.com
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400">
-                  Email: admin@erumskitchette.com
-                </p>
-                <p className="text-xs text-orange-700 dark:text-orange-400">
-                  Password: admin123
+                  Password: burhan123
                 </p>
               </div>
 
@@ -137,12 +137,12 @@ export function AdminLogin() {
 
             {/* Back to Home Link */}
             <div className="mt-6 text-center">
-              <a
-                href="/"
+              <Link
+                to="/"
                 className="text-sm text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-500"
               >
-                ← Back to Customer Site
-              </a>
+                ← Back to customer site
+              </Link>
             </div>
           </CardContent>
         </Card>
