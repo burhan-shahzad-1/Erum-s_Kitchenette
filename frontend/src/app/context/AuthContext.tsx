@@ -28,7 +28,7 @@ interface AuthContextType {
   signup: (name: string, email: string, password: string) => Promise<AuthResult>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => boolean;
-  changePassword: (currentPassword: string, newPassword: string) => AuthResult;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -123,8 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   }, [user]);
 
-  const changePassword = useCallback((_current: string, _next: string): AuthResult => {
-    return { success: false, error: 'Password change is not yet supported.' };
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<AuthResult> => {
+    try {
+      await authApi.changePassword({ currentPassword, newPassword });
+      return { success: true };
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to change password. Please try again.';
+      return { success: false, error: message };
+    }
   }, []);
 
   return (

@@ -1,11 +1,21 @@
 import { useNavigate, useParams } from 'react-router';
 import { motion } from 'motion/react';
-import { ArrowLeft, Phone, MessageCircle, MapPin, Check, Clock, Package, Truck, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Check, Clock, Package, Truck, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { ordersApi } from '../lib/api';
 
-type OrderStatus = 'placed' | 'confirmed' | 'preparing' | 'out-for-delivery' | 'delivered';
+type OrderStatus = 'placed' | 'confirmed' | 'preparing' | 'out-for-delivery' | 'delivered' | 'cancelled';
+
+const BACKEND_TO_STEP: Record<string, OrderStatus> = {
+  pending: 'placed',
+  confirmed: 'confirmed',
+  preparing: 'preparing',
+  ready: 'out-for-delivery',
+  delivered: 'delivered',
+  cancelled: 'cancelled',
+};
 
 interface OrderStep {
   id: OrderStatus;
@@ -15,81 +25,92 @@ interface OrderStep {
 }
 
 const orderSteps: OrderStep[] = [
-  {
-    id: 'placed',
-    title: 'Order Placed',
-    description: 'Order received by the restaurant',
-    icon: Package,
-  },
-  {
-    id: 'confirmed',
-    title: 'Order Confirmed',
-    description: 'Restaurant has accepted the order',
-    icon: CheckCircle2,
-  },
-  {
-    id: 'preparing',
-    title: 'Preparing Your Food',
-    description: 'Kitchen is preparing the order',
-    icon: Clock,
-  },
-  {
-    id: 'out-for-delivery',
-    title: 'Out for Delivery',
-    description: 'Rider has picked up the order',
-    icon: Truck,
-  },
-  {
-    id: 'delivered',
-    title: 'Delivered',
-    description: 'Order successfully delivered',
-    icon: Check,
-  },
+  { id: 'placed', title: 'Order Placed', description: 'Order received by the restaurant', icon: Package },
+  { id: 'confirmed', title: 'Order Confirmed', description: 'Restaurant has accepted the order', icon: CheckCircle2 },
+  { id: 'preparing', title: 'Preparing Your Food', description: 'Kitchen is preparing the order', icon: Clock },
+  { id: 'out-for-delivery', title: 'Out for Delivery', description: 'Rider has picked up the order', icon: Truck },
+  { id: 'delivered', title: 'Delivered', description: 'Order successfully delivered', icon: Check },
 ];
 
-interface RiderInfo {
-  name: string;
-  photo: string;
-  rating: number;
-  phone: string;
+interface OrderData {
+  id: string;
+  status: OrderStatus;
+  items: { title: string; quantity: number; price: number }[];
+  totalAmount: number;
+  deliveryAddress: string;
 }
 
-const mockRider: RiderInfo = {
-  name: 'Ahmed Khan',
-  photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-  rating: 4.8,
-  phone: '+92 300 1234567',
-};
 
 export function OrderTracking() {
   const navigate = useNavigate();
   const { orderId } = useParams();
-  const [currentStatus, setCurrentStatus] = useState<OrderStatus>('preparing');
-  const [estimatedTime, setEstimatedTime] = useState(20);
+  const [order, setOrder] = useState<OrderData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate order progression
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const res = await ordersApi.getOne(orderId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = res.data.data as any;
+      setOrder({
+        id: data.id,
+        status: BACKEND_TO_STEP[data.status] ?? 'placed',
+        items: data.items,
+        totalAmount: data.totalAmount,
+        deliveryAddress: data.deliveryAddress,
+      });
+      setError(null);
+    } catch {
+      setError('Could not load order details.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [orderId]);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (currentStatus === 'placed') setCurrentStatus('confirmed');
-      else if (currentStatus === 'confirmed') setCurrentStatus('preparing');
-      else if (currentStatus === 'preparing') setCurrentStatus('out-for-delivery');
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [currentStatus]);
+    fetchOrder();
+    // Poll every 30 seconds to pick up status updates from the admin
+    const interval = setInterval(fetchOrder, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchOrder]);
 
-  const getCurrentStepIndex = () => {
-    return orderSteps.findIndex(step => step.id === currentStatus);
-  };
+  const currentStatus: OrderStatus = order?.status ?? 'placed';
 
+  const estimatedTime = {
+    placed: 45, confirmed: 40, preparing: 25, 'out-for-delivery': 10, delivered: 0, cancelled: 0,
+  }[currentStatus] ?? 30;
+
+  const getCurrentStepIndex = () => orderSteps.findIndex(s => s.id === currentStatus);
   const isStepCompleted = (stepId: OrderStatus) => {
-    const currentIndex = getCurrentStepIndex();
-    const stepIndex = orderSteps.findIndex(step => step.id === stepId);
-    return stepIndex < currentIndex;
+    if (currentStatus === 'cancelled') return false;
+    return orderSteps.findIndex(s => s.id === stepId) < getCurrentStepIndex();
   };
+  const isStepActive = (stepId: OrderStatus) => stepId === currentStatus;
 
-  const isStepActive = (stepId: OrderStatus) => {
-    return stepId === currentStatus;
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Order not found</h2>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <Button onClick={() => navigate('/profile')} className="bg-gradient-to-r from-orange-600 to-red-600 text-white">
+            Back to Profile
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50/30 via-white to-amber-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
@@ -201,7 +222,7 @@ export function OrderTracking() {
               </Card>
             </motion.div>
 
-            {/* Rider Info Card */}
+            {/* Out-for-delivery notice */}
             {currentStatus === 'out-for-delivery' && (
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -209,59 +230,13 @@ export function OrderTracking() {
                 transition={{ delay: 0.2 }}
               >
                 <Card className="border-2 border-orange-200 dark:border-orange-900/50 shadow-lg bg-white dark:bg-gray-800">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="relative">
-                        <img
-                          src={mockRider.photo}
-                          alt={mockRider.name}
-                          className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover border-4 border-orange-200 dark:border-orange-900"
-                        />
-                        <div className="absolute -bottom-1 -right-1 bg-green-500 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-gray-900 dark:text-gray-100 text-lg lg:text-xl">
-                          {mockRider.name}
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">Your Delivery Rider</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <span
-                                key={i}
-                                className={`text-sm ${
-                                  i < Math.floor(mockRider.rating)
-                                    ? 'text-yellow-500'
-                                    : 'text-gray-300 dark:text-gray-600'
-                                }`}
-                              >
-                                ★
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-1">
-                            {mockRider.rating}
-                          </span>
-                        </div>
-                      </div>
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 flex items-center justify-center flex-shrink-0">
+                      <Truck className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <Button
-                        className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg"
-                        onClick={() => window.open(`tel:${mockRider.phone}`)}
-                      >
-                        <Phone className="w-4 h-4 mr-2" />
-                        Call
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-2 border-orange-300 dark:border-orange-900 text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Chat
-                      </Button>
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Your order is on its way!</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">A rider has picked up your order and is heading to your address.</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -277,21 +252,33 @@ export function OrderTracking() {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="border-2 border-orange-200 dark:border-orange-900/50 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 shadow-lg">
-                <CardContent className="p-6 lg:p-8 text-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-full mb-3 shadow-lg"
-                  >
-                    <Clock className="w-8 h-8 lg:w-10 lg:h-10 text-white" />
-                  </motion.div>
-                  <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                    {estimatedTime} mins
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-300">Estimated Arrival Time</p>
-                </CardContent>
-              </Card>
+              {currentStatus === 'cancelled' ? (
+                <Card className="border-2 border-red-200 dark:border-red-900/50 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 shadow-lg">
+                  <CardContent className="p-6 lg:p-8 text-center">
+                    <XCircle className="w-16 h-16 lg:w-20 lg:h-20 text-red-500 mx-auto mb-3" />
+                    <h2 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-1">Order Cancelled</h2>
+                    <p className="text-gray-600 dark:text-gray-300">This order was cancelled.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-2 border-orange-200 dark:border-orange-900/50 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 shadow-lg">
+                  <CardContent className="p-6 lg:p-8 text-center">
+                    <motion.div
+                      animate={currentStatus !== 'delivered' ? { scale: [1, 1.05, 1] } : {}}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-full mb-3 shadow-lg"
+                    >
+                      <Clock className="w-8 h-8 lg:w-10 lg:h-10 text-white" />
+                    </motion.div>
+                    <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                      {currentStatus === 'delivered' ? 'Delivered!' : `${estimatedTime} mins`}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {currentStatus === 'delivered' ? 'Your order has been delivered' : 'Estimated Arrival Time'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
 
             {/* Order Progress Stepper */}
@@ -413,22 +400,26 @@ export function OrderTracking() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm lg:text-base">
                       <span className="text-gray-600 dark:text-gray-300">Order ID</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100">
-                        #{orderId || 'ORD-2024-1234'}
+                      <span className="font-medium text-gray-900 dark:text-gray-100 text-right max-w-[180px] truncate">
+                        #{order.id}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm lg:text-base">
-                      <span className="text-gray-600 dark:text-gray-300">Items</span>
-                      <span className="font-medium text-gray-900 dark:text-gray-100">3 items</span>
-                    </div>
-                    <div className="flex justify-between text-sm lg:text-base">
+                    {order.items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm lg:text-base">
+                        <span className="text-gray-600 dark:text-gray-300">{item.title} × {item.quantity}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">Rs. {item.price * item.quantity}</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between text-sm lg:text-base">
                       <span className="text-gray-600 dark:text-gray-300">Total Amount</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-500 text-base lg:text-lg">Rs. 1,850</span>
+                      <span className="font-bold text-orange-600 dark:text-orange-500 text-base lg:text-lg">
+                        Rs. {order.totalAmount.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm lg:text-base">
                       <span className="text-gray-600 dark:text-gray-300">Delivery Address</span>
                       <span className="font-medium text-gray-900 dark:text-gray-100 text-right max-w-[200px]">
-                        Johar Town, Lahore
+                        {order.deliveryAddress}
                       </span>
                     </div>
                   </div>

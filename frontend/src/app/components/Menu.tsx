@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, Star, Plus, Heart, ShoppingBag, Sparkles, TrendingUp, Award, Eye } from 'lucide-react';
+import { Search, Star, Plus, Heart, ShoppingBag, Sparkles, TrendingUp, Award, Eye } from 'lucide-react';
 import { foodApi } from '../lib/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,16 +8,10 @@ import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import { ImageWithFallback } from './ImageWithFallback';
 import { EmptyState } from './LoadingSpinner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from './ui/dialog';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Leaf } from 'lucide-react';
 
 interface Product {
@@ -469,12 +463,14 @@ function ProductCard({ product, onAddToCart, onQuickView, onToggleFavorite, isFa
 export function Menu() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [sortBy, setSortBy] = useState('popular');
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deliveryAreas, setDeliveryAreas] = useState<{ id: string; name: string; deliveryCharge: number }[]>([]);
   const { addToCart } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     foodApi.getAll()
@@ -483,10 +479,17 @@ export function Menu() {
         const items = (res.data.data as any[]).map(mapApiProduct);
         setProducts(items.length > 0 ? items : _STATIC_products);
       })
-      .catch(() => {
-        setProducts(_STATIC_products);
-      })
+      .catch(() => setProducts(_STATIC_products))
       .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    import('../lib/api').then(({ deliveryAreasApi }) => {
+      deliveryAreasApi.getActive()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .then((res) => setDeliveryAreas(res.data.data as any[]))
+        .catch(() => {});
+    });
   }, []);
 
   const categories = ['All', ...Array.from(new Set(products.map((p) => p.category)))];
@@ -498,15 +501,14 @@ export function Menu() {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       return matchesSearch && matchesCategory;
     })
-    .sort((a, b) => {
-      if (sortBy === 'price-low') return a.price - b.price;
-      if (sortBy === 'price-high') return b.price - a.price;
-      if (sortBy === 'rating') return b.rating - a.rating;
-      return 0;
-    });
+;
 
-  const bestSellers = products.filter(p => p.isBestSeller).slice(0, 3);
-  const dailySpecials = products.filter(p => p.isSpecial || p.isNew).slice(0, 3);
+  const bestSellers = products.filter(p => p.isBestSeller).slice(0, 3).concat(
+    products.filter(p => !p.isBestSeller)
+  ).slice(0, 3);
+  const dailySpecials = products.filter(p => p.isSpecial || p.isNew).slice(0, 3).concat(
+    products.filter(p => !p.isSpecial && !p.isNew)
+  ).slice(0, 3);
 
   const handleAddToCart = (product: Product) => {
     addToCart({
@@ -523,6 +525,16 @@ export function Menu() {
     e.preventDefault();
     e.stopPropagation();
     setQuickViewProduct(product);
+  };
+
+  const handleToggleFavorite = (id: string) => {
+    if (!isAuthenticated) {
+      sessionStorage.setItem('pending_favorite', id);
+      navigate('/login', { state: { from: '/menu' } });
+      toast.info('Please sign in to save favourites');
+      return;
+    }
+    toggleFavorite(id);
   };
 
   if (isLoading) {
@@ -551,6 +563,26 @@ export function Menu() {
           >
             Our Menu
           </motion.h1>
+          {deliveryAreas.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="inline-flex flex-wrap items-center justify-center gap-2 mt-4 px-4 py-2.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50 rounded-full"
+            >
+              <span className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide">
+                📍 Delivering to:
+              </span>
+              {deliveryAreas.map((area) => (
+                <span
+                  key={area.id}
+                  className="text-xs bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full"
+                >
+                  {area.name}
+                </span>
+              ))}
+            </motion.div>
+          )}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -579,18 +611,6 @@ export function Menu() {
                 className="pl-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 dark:text-gray-100 dark:placeholder-gray-400 transition-all duration-200"
               />
             </div>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                <SelectItem value="popular">Most Popular</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="rating">Highest Rated</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </motion.div>
 
@@ -625,8 +645,8 @@ export function Menu() {
           </div>
         </motion.div>
 
-        {/* Today's Specials - Always show when "All" is selected */}
-        {selectedCategory === 'All' && (
+        {/* Today's Specials - show when "All" is selected and no active search */}
+        {selectedCategory === 'All' && !searchQuery && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -680,8 +700,8 @@ export function Menu() {
           </motion.div>
         )}
 
-        {/* Customer Favorites - Always show when "All" is selected */}
-        {selectedCategory === 'All' && (
+        {/* Customer Favorites - show when "All" is selected and no active search */}
+        {selectedCategory === 'All' && !searchQuery && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -739,9 +759,17 @@ export function Menu() {
           </motion.div>
         )}
 
-        {/* Products Grid - Only show when a specific category is selected */}
-        {selectedCategory !== 'All' && (
-          <AnimatePresence mode="wait">
+        {/* Products Grid - always visible */}
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2"
+        >
+          <ShoppingBag className="w-6 h-6 text-orange-600 dark:text-orange-500" />
+          {selectedCategory === 'All' ? 'All Dishes' : selectedCategory}
+        </motion.h2>
+        <AnimatePresence mode="wait">
             {filteredProducts.length === 0 ? (
               <EmptyState
                 icon={ShoppingBag}
@@ -777,7 +805,7 @@ export function Menu() {
                       product={product}
                       onAddToCart={handleAddToCart}
                       onQuickView={handleQuickView}
-                      onToggleFavorite={toggleFavorite}
+                      onToggleFavorite={handleToggleFavorite}
                       isFavorite={isFavorite(product.id)}
                     />
                   </motion.div>
@@ -785,7 +813,6 @@ export function Menu() {
               </motion.div>
             )}
           </AnimatePresence>
-        )}
       </div>
 
       {/* Quick View Dialog */}

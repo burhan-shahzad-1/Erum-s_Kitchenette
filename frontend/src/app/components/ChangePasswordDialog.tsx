@@ -16,22 +16,27 @@ export function ChangePasswordDialog({ isOpen, onClose }: ChangePasswordDialogPr
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match!');
+      setError('Passwords do not match.');
       return;
     }
     if (newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters.');
+      setError('New password must be at least 6 characters.');
       return;
     }
-    const result = changePassword(currentPassword, newPassword);
+    setIsLoading(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setIsLoading(false);
     if (!result.success) {
-      toast.error(result.error);
+      setError(result.error);
       return;
     }
     toast.success('Password changed successfully!');
@@ -61,6 +66,11 @@ export function ChangePasswordDialog({ isOpen, onClose }: ChangePasswordDialogPr
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              {error}
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
               Current Password
@@ -106,14 +116,21 @@ export function ChangePasswordDialog({ isOpen, onClose }: ChangePasswordDialogPr
               variant="outline"
               onClick={onClose}
               className="flex-1"
+              disabled={isLoading}
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              disabled={isLoading}
               className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
             >
-              Change Password
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving…
+                </span>
+              ) : 'Change Password'}
             </Button>
           </div>
         </form>

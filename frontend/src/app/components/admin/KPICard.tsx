@@ -9,6 +9,7 @@ interface KPICardProps {
   trend?: {
     value: number;
     isPositive: boolean;
+    label?: string;
   };
   delay?: number;
 }
@@ -35,7 +36,7 @@ export function KPICard({ title, value, icon: Icon, trend, delay = 0 }: KPICardP
                   >
                     {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">vs last week</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{trend.label ?? 'vs previous'}</span>
                 </div>
               )}
             </div>

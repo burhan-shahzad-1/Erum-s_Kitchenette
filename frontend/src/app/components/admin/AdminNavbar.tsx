@@ -1,7 +1,6 @@
-import { Bell, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useTheme } from '../../context/ThemeContext';
-import { Badge } from '../ui/badge';
 
 interface AdminNavbarProps {
   title: string;
@@ -34,18 +33,6 @@ export function AdminNavbar({ title }: AdminNavbarProps) {
             className="relative text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
-
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            <Bell className="w-5 h-5" />
-            <Badge className="absolute -top-1 -right-1 px-1.5 min-w-[20px] h-5 flex items-center justify-center bg-gradient-to-r from-orange-600 to-red-600 text-white border-0 text-xs">
-              3
-            </Badge>
           </Button>
 
           {/* Admin Avatar */}

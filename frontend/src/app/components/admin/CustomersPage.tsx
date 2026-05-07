@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Search, User } from 'lucide-react';
+import { Search, User, X, ShoppingBag, Calendar, MapPin } from 'lucide-react';
 import { AdminNavbar } from './AdminNavbar';
 import { useAdmin } from '../../context/AdminContext';
 import { Button } from '../ui/button';
@@ -8,10 +8,27 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Card, CardContent } from '../ui/card';
 
+const statusColors: Record<string, string> = {
+  pending: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  preparing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  ready: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  'out-for-delivery': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  delivered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
 export function CustomersPage() {
-  const { customers } = useAdmin();
+  const { customers, orders } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'new' | 'frequent'>('all');
+  const [historyCustomerId, setHistoryCustomerId] = useState<string | null>(null);
+
+  const historyCustomer = customers.find((c) => c.id === historyCustomerId) ?? null;
+  const historyOrders = historyCustomerId
+    ? [...orders]
+        .filter((o) => o.customerId === historyCustomerId)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    : [];
 
   const getFilteredCustomers = () => {
     let filtered = customers;
@@ -176,6 +193,7 @@ export function CustomersPage() {
                         variant="outline"
                         size="sm"
                         className="w-full text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                        onClick={() => setHistoryCustomerId(customer.id)}
                       >
                         View Order History
                       </Button>
@@ -187,6 +205,147 @@ export function CustomersPage() {
           </div>
         )}
       </div>
+
+      {/* Order History Drawer */}
+      {historyCustomerId && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm"
+          onClick={() => setHistoryCustomerId(null)}
+        />
+      )}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: historyCustomerId ? 0 : '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="fixed right-0 top-0 bottom-0 w-full sm:w-[520px] bg-white dark:bg-gray-900 z-50 shadow-2xl flex flex-col"
+      >
+        {/* Drawer Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-orange-600 to-red-600 flex items-center justify-center text-white font-bold">
+              {historyCustomer?.name.charAt(0) ?? '?'}
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                {historyCustomer?.name ?? 'Customer'}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {historyOrders.length} order{historyOrders.length !== 1 ? 's' : ''} total
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setHistoryCustomerId(null)}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Customer contact info */}
+        {historyCustomer && (historyCustomer.email || historyCustomer.phone) && (
+          <div className="px-6 py-3 bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 flex gap-6 text-sm flex-shrink-0">
+            {historyCustomer.email && (
+              <span className="text-gray-600 dark:text-gray-400">
+                <span className="font-medium text-gray-900 dark:text-white">Email: </span>
+                {historyCustomer.email}
+              </span>
+            )}
+            {historyCustomer.phone && (
+              <span className="text-gray-600 dark:text-gray-400">
+                <span className="font-medium text-gray-900 dark:text-white">Phone: </span>
+                {historyCustomer.phone}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Orders List */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {historyOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                <ShoppingBag className="w-8 h-8 text-gray-400" />
+              </div>
+              <p className="text-gray-500 dark:text-gray-400 font-medium">No orders yet</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                This customer hasn't placed any orders
+              </p>
+            </div>
+          ) : (
+            historyOrders.map((order, index) => (
+              <motion.div
+                key={order.id}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: index * 0.04 }}
+                className="bg-gray-50 dark:bg-gray-950 rounded-xl p-4 border border-gray-200 dark:border-gray-800"
+              >
+                {/* Order header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                      {order.id}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {new Date(order.timestamp).toLocaleString('en-PK', {
+                        dateStyle: 'medium', timeStyle: 'short',
+                      })}
+                    </div>
+                  </div>
+                  <Badge className={`text-xs ${statusColors[order.status] ?? ''}`}>
+                    {order.status.replace('-', ' ')}
+                  </Badge>
+                </div>
+
+                {/* Items */}
+                <div className="space-y-1 mb-3">
+                  {order.items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {item.name} × {item.quantity}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Rs. {(item.price * item.quantity).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 max-w-[60%]">
+                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{order.deliveryAddress}</span>
+                  </div>
+                  <span className="font-bold text-orange-600 dark:text-orange-500">
+                    Rs. {order.total.toLocaleString()}
+                  </span>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </div>
+
+        {/* Summary Footer */}
+        {historyOrders.length > 0 && (
+          <div className="p-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Total spent</span>
+              <span className="font-bold text-gray-900 dark:text-white">
+                Rs. {historyOrders
+                  .filter((o) => o.status !== 'rejected')
+                  .reduce((s, o) => s + o.total, 0)
+                  .toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span className="text-gray-600 dark:text-gray-400">Completed orders</span>
+              <span className="font-bold text-gray-900 dark:text-white">
+                {historyOrders.filter((o) => o.status === 'delivered').length} / {historyOrders.length}
+              </span>
+            </div>
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }

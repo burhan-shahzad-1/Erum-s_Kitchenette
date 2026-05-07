@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { ADMIN_CREDENTIALS, normalizeEmail, STORAGE_KEYS } from '../lib/authConfig';
-import { authApi, foodApi, ordersApi } from '../lib/api';
+import { STORAGE_KEYS } from '../lib/authConfig';
+import { authApi, foodApi, ordersApi, usersApi, deliveryAreasApi } from '../lib/api';
 
 interface Product {
   id: string;
@@ -18,7 +18,7 @@ interface Order {
   id: string;
   customerId: string;
   customerName: string;
-  items: { name: string; quantity: number; price: number }[];
+  items: { foodItemId: string; name: string; quantity: number; price: number }[];
   total: number;
   status: 'pending' | 'preparing' | 'ready' | 'out-for-delivery' | 'delivered' | 'rejected';
   timestamp: string;
@@ -45,6 +45,13 @@ interface DeliveryArea {
   isActive: boolean;
 }
 
+export interface DeliverySettings {
+  defaultDeliveryTime: number;
+  freeDeliveryEnabled: boolean;
+  freeDeliveryThreshold: number;
+  maxDeliveryRadius: number;
+}
+
 interface DashboardStats {
   ordersToday: number;
   revenueToday: number;
@@ -57,14 +64,16 @@ interface AdminContextType {
   orders: Order[];
   customers: Customer[];
   deliveryAreas: DeliveryArea[];
+  deliverySettings: DeliverySettings;
+  saveDeliverySettings: (s: DeliverySettings) => void;
   dashboardStats: DashboardStats;
   addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   addCustomerNote: (customerId: string, note: string) => void;
-  updateDeliveryArea: (id: string, updates: Partial<DeliveryArea>) => void;
-  addDeliveryArea: (area: Omit<DeliveryArea, 'id'>) => void;
+  updateDeliveryArea: (id: string, updates: Partial<DeliveryArea>) => Promise<void>;
+  addDeliveryArea: (area: Omit<DeliveryArea, 'id'>) => Promise<void>;
   isAdminAuthenticated: boolean;
   loginAdmin: (email: string, password: string) => Promise<boolean>;
   logoutAdmin: () => void;
@@ -135,6 +144,7 @@ function mapApiOrder(item: any): Order {
     customerName: `Customer (${String(item.userId).slice(-4)})`,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     items: item.items.map((i: any) => ({
+      foodItemId: i.foodItemId,
       name: i.title,
       quantity: i.quantity,
       price: i.price,
@@ -147,17 +157,35 @@ function mapApiOrder(item: any): Order {
   };
 }
 
-const mockDeliveryAreas: DeliveryArea[] = [
-  { id: '1', name: 'Johar Town', minOrder: 500, deliveryCharge: 100, isActive: true },
-  { id: '2', name: 'DHA Phase 5', minOrder: 700, deliveryCharge: 150, isActive: true },
-  { id: '3', name: 'Gulberg', minOrder: 600, deliveryCharge: 120, isActive: true },
-];
+const DELIVERY_SETTINGS_KEY = 'kitchenette_delivery_settings';
+
+const DEFAULT_DELIVERY_SETTINGS: DeliverySettings = {
+  defaultDeliveryTime: 30,
+  freeDeliveryEnabled: false,
+  freeDeliveryThreshold: 1000,
+  maxDeliveryRadius: 10,
+};
+
+function loadDeliverySettings(): DeliverySettings {
+  try {
+    const raw = localStorage.getItem(DELIVERY_SETTINGS_KEY);
+    return raw ? (JSON.parse(raw) as DeliverySettings) : DEFAULT_DELIVERY_SETTINGS;
+  } catch {
+    return DEFAULT_DELIVERY_SETTINGS;
+  }
+}
 
 export function AdminProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>(mockDeliveryAreas);
+  const [deliveryAreas, setDeliveryAreas] = useState<DeliveryArea[]>([]);
+  const [deliverySettings, setDeliverySettings] = useState<DeliverySettings>(loadDeliverySettings);
+
+  const saveDeliverySettings = (s: DeliverySettings) => {
+    localStorage.setItem(DELIVERY_SETTINGS_KEY, JSON.stringify(s));
+    setDeliverySettings(s);
+  };
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
 
@@ -187,35 +215,62 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = (res.data.data as any[]).map(mapApiOrder);
       setOrders(mapped);
-
-      // Derive unique customers from orders
-      const seen = new Set<string>();
-      const derived: Customer[] = [];
-      for (const o of mapped) {
-        if (!seen.has(o.customerId)) {
-          seen.add(o.customerId);
-          derived.push({
-            id: o.customerId,
-            name: o.customerName,
-            email: '',
-            phone: '',
-            totalOrders: mapped.filter((x) => x.customerId === o.customerId).length,
-            joinDate: o.timestamp,
-          });
-        }
-      }
-      setCustomers(derived);
     } catch {
       /* keep empty */
     }
   }, []);
 
+  const fetchDeliveryAreas = useCallback(async () => {
+    try {
+      const res = await deliveryAreasApi.getAll();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setDeliveryAreas((res.data.data as any[]).map((a) => ({
+        id: a.id, name: a.name, minOrder: a.minOrder,
+        deliveryCharge: a.deliveryCharge, isActive: a.isActive,
+      })));
+    } catch { /* keep empty */ }
+  }, []);
+
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const res = await usersApi.getAll();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const users = res.data.data as any[];
+      setCustomers(
+        users.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email ?? '',
+          phone: u.phone ?? '',
+          totalOrders: 0,
+          joinDate: u.createdAt ?? new Date().toISOString(),
+        })),
+      );
+    } catch {
+      /* keep empty */
+    }
+  }, []);
+
+  // Once we have both orders and customers, compute totalOrders per customer
+  useEffect(() => {
+    if (customers.length > 0 && orders.length > 0) {
+      const countMap = new Map<string, number>();
+      orders.forEach((o) => countMap.set(o.customerId, (countMap.get(o.customerId) ?? 0) + 1));
+      setCustomers((prev) =>
+        prev.map((c) => ({ ...c, totalOrders: countMap.get(c.id) ?? 0 })),
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
   useEffect(() => {
     if (isAdminAuthenticated) {
       fetchProducts();
       fetchOrders();
+      fetchCustomers();
+      fetchDeliveryAreas();
     }
-  }, [isAdminAuthenticated, fetchProducts, fetchOrders]);
+  }, [isAdminAuthenticated, fetchProducts, fetchOrders, fetchCustomers, fetchDeliveryAreas]);
 
   const dashboardStats: DashboardStats = {
     ordersToday: orders.filter((o) => {
@@ -286,16 +341,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const updateDeliveryArea = (id: string, updates: Partial<DeliveryArea>) => {
+  const updateDeliveryArea = async (id: string, updates: Partial<DeliveryArea>) => {
+    await deliveryAreasApi.update(id, updates);
     setDeliveryAreas((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
   };
 
-  const addDeliveryArea = (area: Omit<DeliveryArea, 'id'>) => {
-    setDeliveryAreas((prev) => [...prev, { ...area, id: `DA${Date.now()}` }]);
+  const addDeliveryArea = async (area: Omit<DeliveryArea, 'id'>) => {
+    const res = await deliveryAreasApi.create(area);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const created = (res.data as any).data;
+    setDeliveryAreas((prev) => [...prev, {
+      id: created.id, name: created.name, minOrder: created.minOrder,
+      deliveryCharge: created.deliveryCharge, isActive: created.isActive,
+    }]);
   };
 
   const loginAdmin = async (email: string, password: string): Promise<boolean> => {
-    // Try real backend login first
     try {
       const res = await authApi.login({ email, password });
       const { token, user } = res.data.data as { token: string; user: { id: string; role: string } };
@@ -307,21 +368,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         setIsAdminAuthenticated(true);
         return true;
       }
+      // Logged in but not an owner/admin role
+      return false;
     } catch {
-      // Backend login failed — fall back to hardcoded credentials
+      return false;
     }
-
-    // Hardcoded fallback (works without backend user)
-    if (
-      normalizeEmail(email) === normalizeEmail(ADMIN_CREDENTIALS.email) &&
-      password === ADMIN_CREDENTIALS.password
-    ) {
-      localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
-      setIsAdminAuthenticated(true);
-      return true;
-    }
-
-    return false;
   };
 
   const logoutAdmin = () => {
@@ -339,6 +390,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         orders,
         customers,
         deliveryAreas,
+        deliverySettings,
+        saveDeliverySettings,
         dashboardStats,
         addProduct,
         updateProduct,

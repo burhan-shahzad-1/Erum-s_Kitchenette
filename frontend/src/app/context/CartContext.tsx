@@ -23,35 +23,53 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const cartKey = (userId: string) => `cart_${userId}`;
+const GUEST_KEY = 'cart_guest';
+const userCartKey = (userId: string) => `cart_${userId}`;
 
-function loadFromStorage(userId: string): CartItem[] {
+function readStorage(key: string): CartItem[] {
   try {
-    const raw = localStorage.getItem(cartKey(userId));
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as CartItem[]) : [];
   } catch {
     return [];
   }
 }
 
+function mergeItems(base: CartItem[], incoming: CartItem[]): CartItem[] {
+  const merged = [...base];
+  incoming.forEach((inc) => {
+    const existing = merged.find((i) => i.id === inc.id);
+    if (existing) {
+      existing.quantity += inc.quantity;
+    } else {
+      merged.push(inc);
+    }
+  });
+  return merged;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(() => readStorage(GUEST_KEY));
 
-  // Load from localStorage whenever user changes
+  // When user logs in: merge guest cart into their saved cart, then clear guest key.
+  // When user logs out: load the guest cart (empty by default).
   useEffect(() => {
     if (user?.id) {
-      setItems(loadFromStorage(user.id));
+      const userCart = readStorage(userCartKey(user.id));
+      const guestCart = readStorage(GUEST_KEY);
+      const merged = guestCart.length > 0 ? mergeItems(userCart, guestCart) : userCart;
+      setItems(merged);
+      localStorage.removeItem(GUEST_KEY);
     } else {
-      setItems([]);
+      setItems(readStorage(GUEST_KEY));
     }
   }, [user?.id]);
 
-  // Persist to localStorage on every change
+  // Persist to localStorage on every change — always, guest or logged-in.
   useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(cartKey(user.id), JSON.stringify(items));
-    }
+    const key = user?.id ? userCartKey(user.id) : GUEST_KEY;
+    localStorage.setItem(key, JSON.stringify(items));
   }, [items, user?.id]);
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>) => {
@@ -92,8 +110,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
+    const key = user?.id ? userCartKey(user.id) : GUEST_KEY;
+    localStorage.removeItem(key);
     if (user?.id) {
-      localStorage.removeItem(cartKey(user.id));
       cartApi.clear().catch(console.error);
     }
   }, [user]);

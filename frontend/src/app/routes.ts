@@ -15,6 +15,7 @@ import { OrderTracking } from "./components/OrderTracking";
 import { NotFound } from "./components/NotFound";
 import { LoginPage } from "./components/LoginPage";
 import { SignupPage } from "./components/SignupPage";
+import { RequireAuth } from "./components/RequireAuth";
 import { AdminLogin } from "./components/admin/AdminLogin";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
@@ -34,15 +35,21 @@ export const router = createBrowserRouter([
       { path: "product/:id", Component: ProductDetail },
       { path: "about", Component: About },
       { path: "cart", Component: Cart },
-      { path: "profile", Component: Profile },
-      { path: "checkout", Component: Checkout },
-      { path: "order-tracking/:orderId", Component: OrderTracking },
       { path: "faqs", Component: FAQs },
       { path: "delivery", Component: DeliveryInfo },
       { path: "terms", Component: Terms },
       { path: "privacy", Component: Privacy },
       { path: "login", Component: LoginPage },
       { path: "signup", Component: SignupPage },
+      // ── Protected routes — must be logged in ──────────────────────────
+      {
+        Component: RequireAuth,
+        children: [
+          { path: "profile", Component: Profile },
+          { path: "checkout", Component: Checkout },
+          { path: "order-tracking/:orderId", Component: OrderTracking },
+        ],
+      },
       { path: "*", Component: NotFound },
     ],
   },

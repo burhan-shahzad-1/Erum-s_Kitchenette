@@ -14,21 +14,26 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  // Load favorites from localStorage when user changes
+  // Load favorites from localStorage when user changes; also apply any pending favourite
   useEffect(() => {
     if (user?.id) {
       const savedFavorites = localStorage.getItem(`favorites_${user.id}`);
+      let initial = new Set<string>();
       if (savedFavorites) {
         try {
-          const favArray = JSON.parse(savedFavorites);
-          setFavorites(new Set(favArray));
-        } catch (error) {
-          console.error('Failed to load favorites:', error);
-          setFavorites(new Set());
+          initial = new Set(JSON.parse(savedFavorites));
+        } catch {
+          // ignore parse errors
         }
-      } else {
-        setFavorites(new Set());
       }
+      // Apply the pending favourite saved when the user was unauthenticated
+      const pending = sessionStorage.getItem('pending_favorite');
+      if (pending) {
+        sessionStorage.removeItem('pending_favorite');
+        initial.add(pending);
+        toast.success('Added to favourites!');
+      }
+      setFavorites(initial);
     } else {
       // Clear favorites when user logs out
       setFavorites(new Set());

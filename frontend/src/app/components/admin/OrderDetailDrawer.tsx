@@ -1,7 +1,8 @@
-import { X, MapPin, CreditCard, User, Phone, Mail, Package, Clock, CheckCircle2, Truck, Check } from 'lucide-react';
+import { X, MapPin, CreditCard, User, Phone, Package, Clock, CheckCircle2, Truck, Check } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { motion } from 'motion/react';
+import { useAdmin } from '../../context/AdminContext';
 
 interface Order {
   id: string;
@@ -39,7 +40,10 @@ const statusColors = {
 };
 
 export function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetailDrawerProps) {
+  const { customers } = useAdmin();
   if (!order) return null;
+
+  const customer = customers.find((c) => c.id === order.customerId);
 
   const getCurrentStepIndex = () => {
     return statusSteps.findIndex(step => step.id === order.status);
@@ -132,12 +136,20 @@ export function OrderDetailDrawer({ order, isOpen, onClose }: OrderDetailDrawerP
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <User className="w-5 h-5 text-gray-400" />
-                <span className="text-gray-900 dark:text-white">{order.customerName}</span>
+                <span className="text-gray-900 dark:text-white">{customer?.name ?? order.customerName}</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-400" />
-                <span className="text-gray-900 dark:text-white">+92 300 1234567</span>
-              </div>
+              {customer?.phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-gray-400" />
+                  <span className="text-gray-900 dark:text-white">{customer.phone}</span>
+                </div>
+              )}
+              {customer?.email && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="w-5 h-5 text-gray-400 opacity-0" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{customer.email}</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { motion } from 'motion/react';
-import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
@@ -13,23 +13,24 @@ export function AdminLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { loginAdmin } = useAdmin();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
 
     const success = await loginAdmin(email, password);
+    setIsLoading(false);
 
     if (success) {
       toast.success('Welcome back, Admin!');
       navigate('/admin');
     } else {
-      toast.error('Invalid credentials. Please try again.');
+      setError('Incorrect email or password, or this account does not have admin access.');
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -57,20 +58,32 @@ export function AdminLogin() {
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Inline error */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3"
+                >
+                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                </motion.div>
+              )}
+
               {/* Email Input */}
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error ? 'text-red-400' : 'text-gray-400'}`} />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="burhanshahzad246@gmail.com"
+                    placeholder="admin@kitchenette.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                    className={`pl-10 ${error ? 'border-red-400 dark:border-red-600' : ''}`}
                     required
                   />
                 </div>
@@ -82,14 +95,14 @@ export function AdminLogin() {
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error ? 'text-red-400' : 'text-gray-400'}`} />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                    className={`pl-10 pr-10 ${error ? 'border-red-400 dark:border-red-600' : ''}`}
                     required
                   />
                   <button
@@ -102,16 +115,16 @@ export function AdminLogin() {
                 </div>
               </div>
 
-              {/* Demo Credentials Info */}
+              {/* Credentials hint */}
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg p-4">
                 <p className="text-xs text-orange-800 dark:text-orange-300 font-medium mb-2">
-                  Admin sign-in (local demo):
+                  Owner account credentials:
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400 break-all">
-                  Email: burhanshahzad246@gmail.com
+                  Email: admin@kitchenette.com
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400">
-                  Password: burhan123
+                  Password: Admin@1234
                 </p>
               </div>
 

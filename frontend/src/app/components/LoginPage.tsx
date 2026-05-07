@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import { motion } from 'motion/react';
-import { ChefHat, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { ChefHat, Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -13,6 +13,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,6 +27,7 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
     const result = await login(email, password);
     setIsLoading(false);
@@ -33,7 +35,7 @@ export function LoginPage() {
       toast.success('Welcome back!');
       navigate(from, { replace: true });
     } else {
-      toast.error(result.error);
+      setError(result.error);
     }
   };
 
@@ -71,20 +73,32 @@ export function LoginPage() {
 
             <CardContent className="pt-8 pb-8">
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Inline error */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                  </motion.div>
+                )}
+
                 <div className="space-y-2">
                   <label htmlFor="login-email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Email
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error ? 'text-red-400' : 'text-gray-400'}`} />
                     <Input
                       id="login-email"
                       type="email"
                       autoComplete="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
+                      onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                      className={`pl-10 ${error ? 'border-red-400 focus:border-red-500 dark:border-red-600' : ''}`}
                       required
                     />
                   </div>
@@ -95,15 +109,15 @@ export function LoginPage() {
                     Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error ? 'text-red-400' : 'text-gray-400'}`} />
                     <Input
                       id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
+                      onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                      className={`pl-10 pr-10 ${error ? 'border-red-400 focus:border-red-500 dark:border-red-600' : ''}`}
                       required
                     />
                     <button
@@ -135,7 +149,7 @@ export function LoginPage() {
 
               <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
                 New here?{' '}
-                <Link to="/signup" className="font-medium text-orange-600 hover:text-orange-700 dark:text-orange-500">
+                <Link to="/signup" state={{ from }} className="font-medium text-orange-600 hover:text-orange-700 dark:text-orange-500">
                   Create an account
                 </Link>
               </p>

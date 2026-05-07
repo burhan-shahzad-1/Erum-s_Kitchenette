@@ -24,7 +24,7 @@ interface DeliveryAreaFormData {
 }
 
 export function DeliveryPage() {
-  const { deliveryAreas, updateDeliveryArea, addDeliveryArea } = useAdmin();
+  const { deliveryAreas, updateDeliveryArea, addDeliveryArea, deliverySettings, saveDeliverySettings } = useAdmin();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<any>(null);
   const [formData, setFormData] = useState<DeliveryAreaFormData>({
@@ -34,13 +34,8 @@ export function DeliveryPage() {
     isActive: true,
   });
 
-  // Delivery Settings State
-  const [deliverySettings, setDeliverySettings] = useState({
-    defaultDeliveryTime: 30,
-    freeDeliveryEnabled: false,
-    freeDeliveryThreshold: 1000,
-    maxDeliveryRadius: 10,
-  });
+  // Local draft of settings — only persisted when "Save Settings" is clicked
+  const [settingsDraft, setSettingsDraft] = useState(deliverySettings);
 
   const handleOpenModal = (area?: any) => {
     if (area) {
@@ -186,10 +181,10 @@ export function DeliveryPage() {
                     <Input
                       id="deliveryTime"
                       type="number"
-                      value={deliverySettings.defaultDeliveryTime}
+                      value={settingsDraft.defaultDeliveryTime}
                       onChange={(e) =>
-                        setDeliverySettings({
-                          ...deliverySettings,
+                        setSettingsDraft({
+                          ...settingsDraft,
                           defaultDeliveryTime: Number(e.target.value),
                         })
                       }
@@ -205,10 +200,10 @@ export function DeliveryPage() {
                     <Input
                       id="maxRadius"
                       type="number"
-                      value={deliverySettings.maxDeliveryRadius}
+                      value={settingsDraft.maxDeliveryRadius}
                       onChange={(e) =>
-                        setDeliverySettings({
-                          ...deliverySettings,
+                        setSettingsDraft({
+                          ...settingsDraft,
                           maxDeliveryRadius: Number(e.target.value),
                         })
                       }
@@ -228,14 +223,14 @@ export function DeliveryPage() {
                 </div>
                 <Switch
                   id="freeDelivery"
-                  checked={deliverySettings.freeDeliveryEnabled}
+                  checked={settingsDraft.freeDeliveryEnabled}
                   onCheckedChange={(checked) =>
-                    setDeliverySettings({ ...deliverySettings, freeDeliveryEnabled: checked })
+                    setSettingsDraft({ ...settingsDraft, freeDeliveryEnabled: checked })
                   }
                 />
               </div>
 
-              {deliverySettings.freeDeliveryEnabled && (
+              {settingsDraft.freeDeliveryEnabled && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
@@ -247,10 +242,10 @@ export function DeliveryPage() {
                     <Input
                       id="threshold"
                       type="number"
-                      value={deliverySettings.freeDeliveryThreshold}
+                      value={settingsDraft.freeDeliveryThreshold}
                       onChange={(e) =>
-                        setDeliverySettings({
-                          ...deliverySettings,
+                        setSettingsDraft({
+                          ...settingsDraft,
                           freeDeliveryThreshold: Number(e.target.value),
                         })
                       }
@@ -262,7 +257,7 @@ export function DeliveryPage() {
 
               <div className="pt-4">
                 <Button
-                  onClick={() => toast.success('Delivery settings saved successfully!')}
+                  onClick={() => { saveDeliverySettings(settingsDraft); toast.success('Delivery settings saved!'); }}
                   className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
                 >
                   Save Settings
@@ -272,31 +267,6 @@ export function DeliveryPage() {
           </Card>
         </motion.div>
 
-        {/* Active Deliveries Map (Placeholder) */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle>Active Deliveries Map</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-96 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700">
-                <div className="text-center">
-                  <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Live Delivery Map
-                  </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Track active deliveries in real-time
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
       {/* Add/Edit Area Modal */}
