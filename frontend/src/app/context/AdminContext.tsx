@@ -108,6 +108,7 @@ const STATUS_FROM_BACKEND: Record<string, Order['status']> = {
   confirmed: 'preparing',
   preparing: 'preparing',
   ready: 'ready',
+  'out-for-delivery': 'out-for-delivery',
   delivered: 'delivered',
   cancelled: 'rejected',
 };
@@ -116,7 +117,7 @@ const STATUS_TO_BACKEND: Record<string, string> = {
   pending: 'pending',
   preparing: 'preparing',
   ready: 'ready',
-  'out-for-delivery': 'ready',
+  'out-for-delivery': 'out-for-delivery',
   delivered: 'delivered',
   rejected: 'cancelled',
 };
@@ -213,7 +214,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     try {
       const res = await ordersApi.getAll();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped = (res.data.data as any[]).map(mapApiOrder);
+      const mapped = (res.data.data as any[])
+        .map(mapApiOrder)
+        .sort((a: Order, b: Order) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setOrders(mapped);
     } catch {
       /* keep empty */

@@ -110,7 +110,7 @@ export function AdminDashboard() {
             delay={0.2}
           />
           <KPICard
-            title="Active Deliveries"
+            title="Out for Delivery"
             value={dashboardStats.activeDeliveries}
             icon={Truck}
             delay={0.3}
@@ -234,8 +234,8 @@ export function AdminDashboard() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-gray-900 dark:text-white">{order.id}</span>
-                          <Badge className={`text-xs ${statusColors[order.status]}`}>
-                            {order.status}
+                          <Badge className={`text-xs ${statusColors[order.status as keyof typeof statusColors] ?? 'bg-gray-100 text-gray-700'}`}>
+                            {order.status.replace(/-/g, ' ')}
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{order.customerName}</p>

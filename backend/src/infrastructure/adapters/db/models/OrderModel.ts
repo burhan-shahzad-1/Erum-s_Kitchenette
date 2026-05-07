@@ -20,7 +20,7 @@ const orderSchema = new Schema<OrderDocument>(
     totalAmount: { type: Number, required: true, min: 0 },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'],
+      enum: ['pending', 'confirmed', 'preparing', 'ready', 'out-for-delivery', 'delivered', 'cancelled'],
       default: 'pending',
     },
     paymentStatus: {
