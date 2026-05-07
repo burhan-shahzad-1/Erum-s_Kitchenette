@@ -28,4 +28,13 @@ export class MongoUserRepository implements IUserRepository {
     const doc = await UserModel.findById(id);
     return doc ? toUser(doc) : null;
   }
+
+  async findAll(): Promise<User[]> {
+    const docs = await UserModel.find({ role: 'customer' }).sort({ createdAt: -1 });
+    return docs.map(toUser);
+  }
+
+  async updatePassword(id: string, hashedPassword: string): Promise<void> {
+    await UserModel.findByIdAndUpdate(id, { password: hashedPassword });
+  }
 }

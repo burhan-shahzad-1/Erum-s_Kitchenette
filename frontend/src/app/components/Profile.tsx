@@ -1,23 +1,50 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { User, Package, Heart, Settings, LogOut, Edit } from 'lucide-react';
+import { User, Package, Heart, Settings, LogOut, Edit, ShoppingCart, MapPin, Plus, Trash2, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
+import { useCart } from '../context/CartContext';
+import { foodApi } from '../lib/api';
+import { ImageWithFallback } from './ImageWithFallback';
 import { useNavigate, Link } from 'react-router';
 import { EditProfileDialog } from './EditProfileDialog';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
-import {
-  NotificationPreferencesDialog,
-  PrivacySettingsDialog,
-  DietaryPreferencesDialog,
-  SavedAddressesDialog,
-  PaymentMethodsDialog,
-} from './SettingsDialogs';
 import { toast } from 'sonner';
+
+interface SavedAddress {
+  id: string;
+  label: string;
+  line1: string;
+  city: string;
+  phone: string;
+}
+
+function loadAddresses(userId: string): SavedAddress[] {
+  try {
+    return JSON.parse(localStorage.getItem(`addresses_${userId}`) ?? '[]');
+  } catch { return []; }
+}
+
+function saveAddresses(userId: string, addresses: SavedAddress[]) {
+  localStorage.setItem(`addresses_${userId}`, JSON.stringify(addresses));
+}
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop';
+
+interface FavProduct {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
+}
 
 interface Order {
   id: string;
@@ -51,39 +78,61 @@ const defaultOrders: Order[] = [
   },
 ];
 
-const mockFavorites = [
-  {
-    id: '1',
-    name: 'Chicken Biryani',
-    price: 299,
-    timesOrdered: 5,
-  },
-  {
-    id: '3',
-    name: 'Samosa (6 pcs)',
-    price: 120,
-    timesOrdered: 8,
-  },
-  {
-    id: '2',
-    name: 'Paneer Tikka Masala',
-    price: 249,
-    timesOrdered: 3,
-  },
-];
-
 export function Profile() {
   const [activeTab, setActiveTab] = useState('orders');
   const { user, logout } = useAuth();
+  const { favorites, toggleFavorite } = useFavorites();
+  const { addToCart } = useCart();
   const navigate = useNavigate();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showDietary, setShowDietary] = useState(false);
-  const [showAddresses, setShowAddresses] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
   const [orders, setOrders] = useState<Order[]>(defaultOrders);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [newAddr, setNewAddr] = useState({ label: '', line1: '', city: 'Lahore', phone: '' });
+  const [allProducts, setAllProducts] = useState<FavProduct[]>([]);
+
+  useEffect(() => {
+    foodApi.getAll()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((res) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items: FavProduct[] = (res.data.data as any[]).map((item: any) => ({
+          id: item.id,
+          name: item.title,
+          price: item.price,
+          image: item.imageUrl || FALLBACK_IMAGE,
+          category: item.category,
+        }));
+        setAllProducts(items);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) setAddresses(loadAddresses(user.id));
+  }, [user?.id]);
+
+  const addAddress = () => {
+    if (!newAddr.label || !newAddr.line1 || !newAddr.phone) {
+      toast.error('Please fill in all address fields.');
+      return;
+    }
+    const updated = [...addresses, { ...newAddr, id: Date.now().toString() }];
+    setAddresses(updated);
+    saveAddresses(user!.id, updated);
+    setNewAddr({ label: '', line1: '', city: 'Lahore', phone: '' });
+    setShowAddressForm(false);
+    toast.success('Address saved!');
+  };
+
+  const removeAddress = (id: string) => {
+    const updated = addresses.filter((a) => a.id !== id);
+    setAddresses(updated);
+    saveAddresses(user!.id, updated);
+  };
+
+  const favoriteProducts = allProducts.filter((p) => favorites.has(p.id));
 
   if (!user) {
     return (
@@ -185,7 +234,7 @@ export function Profile() {
           </Card>
           <Card className="border-orange-100 text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">{mockFavorites.length}</div>
+              <div className="text-2xl font-bold text-orange-600">{favorites.size}</div>
               <div className="text-sm text-gray-600">Favorites</div>
             </CardContent>
           </Card>
@@ -287,40 +336,80 @@ export function Profile() {
 
             {/* Favorites Tab */}
             <TabsContent value="favorites">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {mockFavorites.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
+              {favoriteProducts.length === 0 ? (
+                <div className="text-center py-16">
+                  <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    No favourites yet
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">
+                    Tap the heart icon on any dish to save it here.
+                  </p>
+                  <Button
+                    onClick={() => navigate('/menu')}
+                    className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
                   >
-                    <Card className="border-orange-100 hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <h3 className="font-semibold text-gray-900 mb-1">
-                              {item.name}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              Ordered {item.timesOrdered} times
-                            </p>
+                    Browse Menu
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {favoriteProducts.map((item, index) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="border-orange-100 hover:shadow-lg transition-shadow overflow-hidden">
+                        <Link to={`/product/${item.id}`}>
+                          <div className="h-40 overflow-hidden">
+                            <ImageWithFallback
+                              src={item.image}
+                              alt={item.name}
+                              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            />
                           </div>
-                          <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-lg font-bold text-orange-600">
-                            Rs. {item.price}
+                        </Link>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1 min-w-0 pr-2">
+                              <Link to={`/product/${item.id}`}>
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate hover:text-orange-600 transition-colors">
+                                  {item.name}
+                                </h3>
+                              </Link>
+                            </div>
+                            <button
+                              onClick={() => toggleFavorite(item.id)}
+                              className="shrink-0 text-red-500 hover:text-red-700 transition-colors"
+                              aria-label="Remove from favourites"
+                            >
+                              <Heart className="w-5 h-5 fill-red-500" />
+                            </button>
                           </div>
-                          <Button size="sm" className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white">
-                            Order Again
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-lg font-bold text-orange-600 dark:text-orange-500">
+                              Rs. {item.price}
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                addToCart({ id: item.id, name: item.name, price: item.price, image: item.image, category: item.category });
+                                toast.success(`${item.name} added to cart!`);
+                              }}
+                              className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5 mr-1" />
+                              Add to Cart
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* Profile Tab */}
@@ -362,62 +451,120 @@ export function Profile() {
             {/* Settings Tab */}
             <TabsContent value="settings">
               <div className="space-y-4">
+                {/* Account */}
                 <Card className="border-orange-100">
                   <CardContent className="p-6">
-                    <h3 className="font-semibold text-gray-900 mb-4">Account Settings</h3>
-                    <div className="space-y-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowChangePassword(true)}
-                        className="w-full justify-start"
-                      >
-                        Change Password
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowNotifications(true)}
-                        className="w-full justify-start"
-                      >
-                        Notification Preferences
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowPrivacy(true)}
-                        className="w-full justify-start"
-                      >
-                        Privacy Settings
-                      </Button>
-                    </div>
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Account</h3>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowChangePassword(true)}
+                      className="w-full justify-start"
+                    >
+                      Change Password
+                    </Button>
                   </CardContent>
                 </Card>
+
+                {/* Saved Addresses */}
                 <Card className="border-orange-100">
                   <CardContent className="p-6">
-                    <h3 className="font-semibold text-gray-900 mb-4">Preferences</h3>
-                    <div className="space-y-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowDietary(true)}
-                        className="w-full justify-start"
-                      >
-                        Dietary Preferences
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowAddresses(true)}
-                        className="w-full justify-start"
-                      >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-orange-600" />
                         Saved Addresses
-                      </Button>
+                      </h3>
                       <Button
+                        size="sm"
                         variant="outline"
-                        onClick={() => setShowPayment(true)}
-                        className="w-full justify-start"
+                        onClick={() => setShowAddressForm((v) => !v)}
+                        className="border-orange-300 text-orange-600 hover:bg-orange-50"
                       >
-                        Payment Methods
+                        {showAddressForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4 mr-1" />}
+                        {showAddressForm ? 'Cancel' : 'Add New'}
                       </Button>
                     </div>
+
+                    {/* Add address form */}
+                    {showAddressForm && (
+                      <div className="mb-4 p-4 bg-orange-50 dark:bg-orange-900/10 rounded-xl space-y-3 border border-orange-100 dark:border-orange-800">
+                        <div>
+                          <Label className="text-xs text-gray-600 dark:text-gray-400">Label (e.g. Home, Work)</Label>
+                          <Input
+                            placeholder="Home"
+                            value={newAddr.label}
+                            onChange={(e) => setNewAddr({ ...newAddr, label: e.target.value })}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-600 dark:text-gray-400">Street Address</Label>
+                          <Input
+                            placeholder="House no., street, block"
+                            value={newAddr.line1}
+                            onChange={(e) => setNewAddr({ ...newAddr, line1: e.target.value })}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">City</Label>
+                            <Input
+                              placeholder="Lahore"
+                              value={newAddr.city}
+                              onChange={(e) => setNewAddr({ ...newAddr, city: e.target.value })}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-gray-600 dark:text-gray-400">Phone</Label>
+                            <Input
+                              placeholder="+92 321 1234567"
+                              value={newAddr.phone}
+                              onChange={(e) => setNewAddr({ ...newAddr, phone: e.target.value })}
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          onClick={addAddress}
+                          className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
+                        >
+                          Save Address
+                        </Button>
+                      </div>
+                    )}
+
+                    {addresses.length === 0 && !showAddressForm ? (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No saved addresses yet. Add one to speed up checkout.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {addresses.map((addr) => (
+                          <div
+                            key={addr.id}
+                            className="flex items-start justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800"
+                          >
+                            <div>
+                              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{addr.label}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{addr.line1}, {addr.city}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{addr.phone}</p>
+                            </div>
+                            <button
+                              onClick={() => removeAddress(addr.id)}
+                              className="text-gray-400 hover:text-red-500 transition-colors ml-2 mt-0.5"
+                              aria-label="Remove address"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
+
+                {/* Log out */}
                 <Card className="border-red-100">
                   <CardContent className="p-6">
                     <Button
@@ -438,11 +585,6 @@ export function Profile() {
 
       <EditProfileDialog isOpen={showEditProfile} onClose={() => setShowEditProfile(false)} />
       <ChangePasswordDialog isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
-      <NotificationPreferencesDialog isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
-      <PrivacySettingsDialog isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
-      <DietaryPreferencesDialog isOpen={showDietary} onClose={() => setShowDietary(false)} />
-      <SavedAddressesDialog isOpen={showAddresses} onClose={() => setShowAddresses(false)} />
-      <PaymentMethodsDialog isOpen={showPayment} onClose={() => setShowPayment(false)} />
     </div>
   );
 }

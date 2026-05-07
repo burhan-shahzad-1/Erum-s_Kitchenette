@@ -25,6 +25,11 @@ const controller = new OrderController(
 const placeOrderRules = [
   body('deliveryAddress').trim().notEmpty().withMessage('Delivery address is required'),
   body('notes').optional().trim(),
+  body('items').optional().isArray().withMessage('Items must be an array'),
+  body('items.*.foodItemId').optional().notEmpty().withMessage('Each item must have a foodItemId'),
+  body('items.*.title').optional().notEmpty().withMessage('Each item must have a title'),
+  body('items.*.price').optional().isFloat({ min: 0 }).withMessage('Each item price must be a positive number'),
+  body('items.*.quantity').optional().isInt({ min: 1 }).withMessage('Each item quantity must be at least 1'),
 ];
 
 const updateStatusRules = [

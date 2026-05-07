@@ -20,6 +20,7 @@ export class OrderController {
         userId: req.user!.userId,
         deliveryAddress: req.body.deliveryAddress,
         notes: req.body.notes,
+        items: req.body.items,
       });
       sendSuccess(res, order, 201, 'Order placed successfully');
     } catch (err) {

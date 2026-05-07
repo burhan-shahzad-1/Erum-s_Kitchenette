@@ -9,25 +9,28 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useNavigate } from 'react-router';
 
-const weeklyRevenueData = [
-  { day: 'Mon', revenue: 12500 },
-  { day: 'Tue', revenue: 15200 },
-  { day: 'Wed', revenue: 18900 },
-  { day: 'Thu', revenue: 14300 },
-  { day: 'Fri', revenue: 21500 },
-  { day: 'Sat', revenue: 25800 },
-  { day: 'Sun', revenue: 22400 },
-];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const ordersPerDayData = [
-  { day: 'Mon', orders: 45 },
-  { day: 'Tue', orders: 52 },
-  { day: 'Wed', orders: 68 },
-  { day: 'Thu', orders: 49 },
-  { day: 'Fri', orders: 78 },
-  { day: 'Sat', orders: 89 },
-  { day: 'Sun', orders: 72 },
-];
+function buildLast7Days(orders: { timestamp: string; total: number; status: string }[]) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    date.setHours(0, 0, 0, 0);
+    const next = new Date(date);
+    next.setDate(next.getDate() + 1);
+
+    const dayOrders = orders.filter((o) => {
+      const t = new Date(o.timestamp);
+      return t >= date && t < next && o.status !== 'rejected';
+    });
+
+    return {
+      day: DAY_NAMES[date.getDay()],
+      revenue: dayOrders.reduce((s, o) => s + o.total, 0),
+      orders: dayOrders.length,
+    };
+  });
+}
 
 const statusColors = {
   pending: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
@@ -38,16 +41,51 @@ const statusColors = {
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
+function pctChange(current: number, previous: number): { value: number; isPositive: boolean } | undefined {
+  if (previous === 0) return undefined;
+  const delta = Math.round(((current - previous) / previous) * 100);
+  return { value: Math.abs(delta), isPositive: delta >= 0 };
+}
+
 export function AdminDashboard() {
   const { dashboardStats, orders, products } = useAdmin();
   const navigate = useNavigate();
 
-  // Get recent orders (last 5)
-  const recentOrders = orders.slice(0, 5);
+  const last7Days = buildLast7Days(orders);
+  const recentOrders = [...orders].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 5);
 
-  // Get top products by revenue
+  // Compute this-week vs last-week metrics for real trend arrows
+  const now = new Date();
+  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = new Date(startOfToday); startOfYesterday.setDate(startOfToday.getDate() - 1);
+  const startOfThisWeek = new Date(startOfToday); startOfThisWeek.setDate(startOfToday.getDate() - 6);
+  const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7);
+
+  const inRange = (ts: string, from: Date, to: Date) => { const t = new Date(ts); return t >= from && t < to; };
+  const active = orders.filter((o) => o.status !== 'rejected');
+
+  const ordersToday = active.filter((o) => inRange(o.timestamp, startOfToday, now)).length;
+  const ordersYesterday = active.filter((o) => inRange(o.timestamp, startOfYesterday, startOfToday)).length;
+
+  const revenueThisWeek = active.filter((o) => inRange(o.timestamp, startOfThisWeek, now)).reduce((s, o) => s + o.total, 0);
+  const revenueLastWeek = active.filter((o) => inRange(o.timestamp, startOfLastWeek, startOfThisWeek)).reduce((s, o) => s + o.total, 0);
+
+  // Compute per-product order count and revenue from real orders
+  const productStatsMap = new Map<string, { orderCount: number; revenue: number }>();
+  orders.forEach((order) => {
+    if (order.status === 'rejected') return;
+    order.items.forEach((item) => {
+      const existing = productStatsMap.get(item.foodItemId) ?? { orderCount: 0, revenue: 0 };
+      productStatsMap.set(item.foodItemId, {
+        orderCount: existing.orderCount + item.quantity,
+        revenue: existing.revenue + item.price * item.quantity,
+      });
+    });
+  });
+
   const topProducts = [...products]
-    .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+    .map((p) => ({ ...p, ...(productStatsMap.get(p.id) ?? { orderCount: 0, revenue: 0 }) }))
+    .sort((a, b) => b.orderCount - a.orderCount)
     .slice(0, 5);
 
   return (
@@ -59,16 +97,16 @@ export function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard
             title="Orders Today"
-            value={dashboardStats.ordersToday}
+            value={ordersToday}
             icon={ShoppingCart}
-            trend={{ value: 12, isPositive: true }}
+            trend={pctChange(ordersToday, ordersYesterday)}
             delay={0.1}
           />
           <KPICard
-            title="Revenue Today"
-            value={`Rs. ${dashboardStats.revenueToday.toLocaleString()}`}
+            title="Revenue This Week"
+            value={`Rs. ${revenueThisWeek.toLocaleString()}`}
             icon={TrendingUp}
-            trend={{ value: 8, isPositive: true }}
+            trend={pctChange(revenueThisWeek, revenueLastWeek)}
             delay={0.2}
           />
           <KPICard
@@ -81,7 +119,6 @@ export function AdminDashboard() {
             title="New Customers"
             value={dashboardStats.newCustomers}
             icon={Users}
-            trend={{ value: 15, isPositive: true }}
             delay={0.4}
           />
         </div>
@@ -100,7 +137,7 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={weeklyRevenueData}>
+                  <LineChart data={last7Days}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-800" />
                     <XAxis dataKey="day" className="text-xs" />
                     <YAxis className="text-xs" />
@@ -142,7 +179,7 @@ export function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={ordersPerDayData}>
+                  <BarChart data={last7Days}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-800" />
                     <XAxis dataKey="day" className="text-xs" />
                     <YAxis className="text-xs" />

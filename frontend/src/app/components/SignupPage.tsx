@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useLocation } from 'react-router';
 import { motion } from 'motion/react';
-import { ChefHat, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
+import { ChefHat, Eye, EyeOff, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -15,23 +15,27 @@ export function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { signup, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (password !== confirmPassword) {
-      toast.error('Passwords do not match.');
+      setError('Passwords do not match. Please re-enter them.');
       return;
     }
     if (password.length < 6) {
-      toast.error('Password must be at least 6 characters.');
+      setError('Password must be at least 6 characters.');
       return;
     }
     setIsLoading(true);
@@ -39,9 +43,9 @@ export function SignupPage() {
     setIsLoading(false);
     if (result.success) {
       toast.success('Account created! Welcome to Erum\'s Kitchette.');
-      navigate('/', { replace: true });
+      navigate(from, { replace: true });
     } else {
-      toast.error(result.error);
+      setError(result.error);
     }
   };
 
@@ -79,6 +83,18 @@ export function SignupPage() {
 
             <CardContent className="pt-8 pb-8">
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Inline error */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+                  </motion.div>
+                )}
+
                 <div className="space-y-2">
                   <label htmlFor="signup-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Full name
@@ -91,7 +107,7 @@ export function SignupPage() {
                       autoComplete="name"
                       placeholder="Your name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => { setName(e.target.value); setError(null); }}
                       className="pl-10"
                       required
                     />
@@ -103,15 +119,15 @@ export function SignupPage() {
                     Email
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error?.toLowerCase().includes('email') ? 'text-red-400' : 'text-gray-400'}`} />
                     <Input
                       id="signup-email"
                       type="email"
                       autoComplete="email"
                       placeholder="you@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
+                      onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                      className={`pl-10 ${error?.toLowerCase().includes('email') ? 'border-red-400 dark:border-red-600' : ''}`}
                       required
                     />
                   </div>
@@ -122,15 +138,15 @@ export function SignupPage() {
                     Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${error?.toLowerCase().includes('password') ? 'text-red-400' : 'text-gray-400'}`} />
                     <Input
                       id="signup-password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="new-password"
                       placeholder="At least 6 characters"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
+                      onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                      className={`pl-10 pr-10 ${error?.toLowerCase().includes('password') ? 'border-red-400 dark:border-red-600' : ''}`}
                       required
                       minLength={6}
                     />
@@ -155,7 +171,8 @@ export function SignupPage() {
                     autoComplete="new-password"
                     placeholder="Repeat password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }}
+                    className={error?.toLowerCase().includes('match') ? 'border-red-400 dark:border-red-600' : ''}
                     required
                     minLength={6}
                   />

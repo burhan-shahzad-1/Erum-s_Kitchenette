@@ -60,9 +60,8 @@ export function OrdersPage() {
     toast.error('Order rejected');
   };
 
-  const handleStatusChange = (orderId: string, status: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    updateOrderStatus(orderId, status);
+  const handleStatusChange = (orderId: string, status: string) => {
+    updateOrderStatus(orderId, status as any);
     toast.success(`Order status updated to ${status}!`);
   };
 
@@ -205,15 +204,14 @@ export function OrdersPage() {
                         ) : order.status !== 'delivered' && order.status !== 'rejected' ? (
                           <Select
                             value={order.status}
-                            onValueChange={(value) => handleStatusChange(order.id, value, {} as any)}
+                            onValueChange={(value) => handleStatusChange(order.id, value)}
                           >
                             <SelectTrigger className="w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="preparing">Preparing</SelectItem>
-                              <SelectItem value="ready">Ready</SelectItem>
-                              <SelectItem value="out-for-delivery">Out for Delivery</SelectItem>
+                              <SelectItem value="ready">Ready for Delivery</SelectItem>
                               <SelectItem value="delivered">Delivered</SelectItem>
                             </SelectContent>
                           </Select>

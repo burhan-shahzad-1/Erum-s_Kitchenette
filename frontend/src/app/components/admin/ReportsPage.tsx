@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Download, Calendar, TrendingUp, DollarSign, ShoppingCart, Award } from 'lucide-react';
+import { Calendar, TrendingUp, DollarSign, ShoppingCart, Award } from 'lucide-react';
 import { AdminNavbar } from './AdminNavbar';
 import { useAdmin } from '../../context/AdminContext';
 import { Button } from '../ui/button';
@@ -22,48 +22,124 @@ import {
   Legend,
 } from 'recharts';
 
-const revenueData = [
-  { date: 'Mar 8', revenue: 15500 },
-  { date: 'Mar 9', revenue: 18200 },
-  { date: 'Mar 10', revenue: 21900 },
-  { date: 'Mar 11', revenue: 19300 },
-  { date: 'Mar 12', revenue: 25500 },
-  { date: 'Mar 13', revenue: 28800 },
-  { date: 'Mar 14', revenue: 26400 },
-  { date: 'Mar 15', revenue: 22100 },
-];
-
-const categoryData = [
-  { category: 'Main Dishes', orders: 245, revenue: 110250 },
-  { category: 'Desserts', orders: 189, revenue: 33930 },
-  { category: 'Appetizers', orders: 156, revenue: 31200 },
-  { category: 'Beverages', orders: 201, revenue: 20100 },
-  { category: 'Snacks', orders: 134, revenue: 20100 },
-];
-
 const COLORS = ['#f97316', '#dc2626', '#ea580c', '#fb923c', '#fdba74'];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  main: 'Main Dishes', snack: 'Snacks', dessert: 'Desserts',
+  beverage: 'Beverages', appetizer: 'Appetizers', other: 'Other',
+};
 
 export function ReportsPage() {
   const { products, orders } = useAdmin();
   const [dateRange, setDateRange] = useState('week');
 
-  // Calculate total metrics
-  const totalRevenue = categoryData.reduce((sum, item) => sum + item.revenue, 0);
-  const totalOrders = categoryData.reduce((sum, item) => sum + item.orders, 0);
-  const averageOrderValue = totalRevenue / totalOrders;
+  // Filter orders by selected date range (exclude cancelled)
+  const activeOrders = orders.filter((o) => o.status !== 'rejected');
+  const filteredOrders = activeOrders.filter((o) => {
+    const t = new Date(o.timestamp);
+    const now = new Date();
+    if (dateRange === 'today') {
+      return t.toDateString() === now.toDateString();
+    }
+    if (dateRange === 'week') {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 6);
+      weekAgo.setHours(0, 0, 0, 0);
+      return t >= weekAgo;
+    }
+    if (dateRange === 'month') {
+      const monthAgo = new Date(now);
+      monthAgo.setDate(now.getDate() - 29);
+      monthAgo.setHours(0, 0, 0, 0);
+      return t >= monthAgo;
+    }
+    return true;
+  });
 
-  // Get top products
+  // Revenue trend — one data point per day in the range
+  const days = dateRange === 'today' ? 1 : dateRange === 'week' ? 7 : 30;
+  const revenueData = Array.from({ length: days }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (days - 1 - i));
+    date.setHours(0, 0, 0, 0);
+    const next = new Date(date);
+    next.setDate(next.getDate() + 1);
+    const dayOrders = activeOrders.filter((o) => {
+      const t = new Date(o.timestamp);
+      return t >= date && t < next;
+    });
+    const label = days <= 7
+      ? date.toLocaleDateString('en-PK', { weekday: 'short' })
+      : date.toLocaleDateString('en-PK', { month: 'short', day: 'numeric' });
+    return { date: label, revenue: dayOrders.reduce((s, o) => s + o.total, 0) };
+  });
+
+  // Category breakdown — match order items to products to get category
+  const productCategoryMap = new Map(products.map((p) => [p.id, p.category]));
+  const categoryMap = new Map<string, { orders: number; revenue: number }>();
+  filteredOrders.forEach((order) => {
+    order.items.forEach((item) => {
+      const rawCat = productCategoryMap.get(item.foodItemId) ?? 'other';
+      const label = CATEGORY_LABELS[rawCat] ?? rawCat;
+      const existing = categoryMap.get(label) ?? { orders: 0, revenue: 0 };
+      categoryMap.set(label, {
+        orders: existing.orders + item.quantity,
+        revenue: existing.revenue + item.price * item.quantity,
+      });
+    });
+  });
+  const categoryData = Array.from(categoryMap.entries())
+    .map(([category, stats]) => ({ category, ...stats }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  // Top products by order count
+  const productStatsMap = new Map<string, { orderCount: number; revenue: number }>();
+  filteredOrders.forEach((order) => {
+    order.items.forEach((item) => {
+      const existing = productStatsMap.get(item.foodItemId) ?? { orderCount: 0, revenue: 0 };
+      productStatsMap.set(item.foodItemId, {
+        orderCount: existing.orderCount + item.quantity,
+        revenue: existing.revenue + item.price * item.quantity,
+      });
+    });
+  });
   const topProducts = [...products]
-    .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+    .map((p) => ({ ...p, ...(productStatsMap.get(p.id) ?? { orderCount: 0, revenue: 0 }) }))
+    .sort((a, b) => b.orderCount - a.orderCount)
     .slice(0, 10);
 
-  const topCategory = categoryData.reduce((max, item) =>
-    item.revenue > max.revenue ? item : max
-  );
+  // Summary KPIs
+  const totalRevenue = filteredOrders.reduce((s, o) => s + o.total, 0);
+  const totalOrders = filteredOrders.length;
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const topCategory = categoryData[0] ?? { category: '—', revenue: 0 };
 
-  const handleExport = (format: 'pdf' | 'csv') => {
-    alert(`Exporting report as ${format.toUpperCase()}...`);
-  };
+  // Trends: compare current period to the same-length period before it
+  const prevOrders = activeOrders.filter((o) => {
+    const t = new Date(o.timestamp);
+    const now2 = new Date();
+    if (dateRange === 'today') {
+      const yesterday = new Date(now2); yesterday.setDate(now2.getDate() - 1);
+      const dayBefore = new Date(yesterday); dayBefore.setDate(yesterday.getDate() - 1);
+      return t >= dayBefore && t < yesterday;
+    }
+    if (dateRange === 'week') {
+      const twoWeeksAgo = new Date(now2); twoWeeksAgo.setDate(now2.getDate() - 13); twoWeeksAgo.setHours(0, 0, 0, 0);
+      const weekAgo = new Date(now2); weekAgo.setDate(now2.getDate() - 6); weekAgo.setHours(0, 0, 0, 0);
+      return t >= twoWeeksAgo && t < weekAgo;
+    }
+    const twoMonthsAgo = new Date(now2); twoMonthsAgo.setDate(now2.getDate() - 59); twoMonthsAgo.setHours(0, 0, 0, 0);
+    const monthAgo = new Date(now2); monthAgo.setDate(now2.getDate() - 29); monthAgo.setHours(0, 0, 0, 0);
+    return t >= twoMonthsAgo && t < monthAgo;
+  });
+  const prevRevenue = prevOrders.reduce((s, o) => s + o.total, 0);
+  const prevCount = prevOrders.length;
+
+  function pctChange(current: number, previous: number) {
+    if (previous === 0) return undefined;
+    const delta = Math.round(((current - previous) / previous) * 100);
+    return { value: Math.abs(delta), isPositive: delta >= 0 };
+  }
 
   return (
     <div className="min-h-screen">
@@ -103,16 +179,6 @@ export function ReportsPage() {
             </Button>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport('pdf')}>
-              <Download className="w-4 h-4 mr-2" />
-              Export PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
         </div>
 
         {/* KPI Cards */}
@@ -121,21 +187,20 @@ export function ReportsPage() {
             title="Total Revenue"
             value={`Rs. ${totalRevenue.toLocaleString()}`}
             icon={DollarSign}
-            trend={{ value: 15, isPositive: true }}
+            trend={pctChange(totalRevenue, prevRevenue)}
             delay={0.1}
           />
           <KPICard
             title="Total Orders"
             value={totalOrders}
             icon={ShoppingCart}
-            trend={{ value: 8, isPositive: true }}
+            trend={pctChange(totalOrders, prevCount)}
             delay={0.2}
           />
           <KPICard
             title="Avg. Order Value"
             value={`Rs. ${Math.round(averageOrderValue)}`}
             icon={TrendingUp}
-            trend={{ value: 5, isPositive: true }}
             delay={0.3}
           />
           <KPICard

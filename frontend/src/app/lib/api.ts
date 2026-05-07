@@ -12,11 +12,14 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// If token is expired/invalid, clear storage and redirect to login
+// If token is expired/invalid, clear storage and redirect to login.
+// Skip this for auth endpoints themselves — a 401 on /auth/login just means
+// wrong credentials, not an expired session, so let the form handle it.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthEndpoint = error.config?.url?.includes('/auth/');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -32,6 +35,8 @@ export const authApi = {
   login: (data: { email: string; password: string }) =>
     api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.put('/auth/change-password', data),
 };
 
 // ── Food Items ────────────────────────────────────────────────────────────────
@@ -54,13 +59,36 @@ export const cartApi = {
 };
 
 // ── Orders ────────────────────────────────────────────────────────────────────
+export interface OrderItemPayload {
+  foodItemId: string;
+  title: string;
+  price: number;
+  quantity: number;
+}
+
 export const ordersApi = {
-  place: (data: { deliveryAddress: string; notes?: string }) =>
+  place: (data: { deliveryAddress: string; notes?: string; items: OrderItemPayload[] }) =>
     api.post('/orders', data),
   getAll: () => api.get('/orders'),
   getOne: (id: string) => api.get(`/orders/${id}`),
   updateStatus: (id: string, status: string) =>
     api.patch(`/orders/${id}/status`, { status }),
+};
+
+// ── Users (admin) ─────────────────────────────────────────────────────────────
+export const usersApi = {
+  getAll: () => api.get('/auth/users'),
+};
+
+// ── Delivery Areas ────────────────────────────────────────────────────────────
+export const deliveryAreasApi = {
+  getActive: () => api.get('/delivery-areas'),
+  getAll: () => api.get('/delivery-areas/all'),
+  create: (data: { name: string; minOrder: number; deliveryCharge: number; isActive: boolean }) =>
+    api.post('/delivery-areas', data),
+  update: (id: string, data: Partial<{ name: string; minOrder: number; deliveryCharge: number; isActive: boolean }>) =>
+    api.put(`/delivery-areas/${id}`, data),
+  remove: (id: string) => api.delete(`/delivery-areas/${id}`),
 };
 
 // ── Reviews ───────────────────────────────────────────────────────────────────
