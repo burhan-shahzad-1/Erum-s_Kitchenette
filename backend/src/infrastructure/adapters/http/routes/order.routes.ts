@@ -34,7 +34,7 @@ const placeOrderRules = [
 
 const updateStatusRules = [
   body('status')
-    .isIn(['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'])
+    .isIn(['pending', 'confirmed', 'preparing', 'ready', 'out-for-delivery', 'delivered', 'cancelled'])
     .withMessage('Invalid order status'),
 ];
 

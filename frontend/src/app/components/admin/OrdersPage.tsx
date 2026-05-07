@@ -26,22 +26,46 @@ const statusColors = {
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
-type OrderStatus = 'all' | 'pending' | 'preparing' | 'ready' | 'out-for-delivery' | 'delivered' | 'rejected';
 
 export function OrdersPage() {
   const { orders, updateOrderStatus } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<OrderStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'preparing' | 'ready' | 'out-for-delivery' | 'delivered' | 'rejected'>('all');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const STATUS_PRIORITY: Record<string, number> = {
+    pending: 0,
+    preparing: 1,
+    ready: 2,
+    'out-for-delivery': 3,
+    delivered: 4,
+    rejected: 5,
+  };
+
+  const statusTabs = [
+    { label: 'All', value: 'all' },
+    { label: 'Pending', value: 'pending' },
+    { label: 'Preparing', value: 'preparing' },
+    { label: 'Ready', value: 'ready' },
+    { label: 'Out for Delivery', value: 'out-for-delivery' },
+    { label: 'Delivered', value: 'delivered' },
+    { label: 'Rejected', value: 'rejected' },
+  ] as const;
+
+  const filteredOrders = orders
+    .filter(order => {
+      const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const pa = STATUS_PRIORITY[a.status] ?? 99;
+      const pb = STATUS_PRIORITY[b.status] ?? 99;
+      if (pa !== pb) return pa - pb;
+      // Within same status: newest first
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
 
   const handleOrderClick = (order: any) => {
     setSelectedOrder(order);
@@ -65,14 +89,6 @@ export function OrdersPage() {
     toast.success(`Order status updated to ${status}!`);
   };
 
-  const statusTabs: { label: string; value: OrderStatus }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'Preparing', value: 'preparing' },
-    { label: 'Ready', value: 'ready' },
-    { label: 'Out for Delivery', value: 'out-for-delivery' },
-    { label: 'Delivered', value: 'delivered' },
-  ];
 
   return (
     <div className="min-h-screen">
@@ -85,7 +101,7 @@ export function OrdersPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
-                placeholder="Search by order ID or customer name..."
+                placeholder="Search by order ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -104,8 +120,8 @@ export function OrdersPage() {
               onClick={() => setStatusFilter(tab.value)}
               className={
                 statusFilter === tab.value
-                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white'
-                  : ''
+                  ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white whitespace-nowrap'
+                  : 'whitespace-nowrap'
               }
             >
               {tab.label}
@@ -150,8 +166,8 @@ export function OrdersPage() {
                         <div className="font-mono font-bold text-gray-900 dark:text-white mb-2">
                           {order.id}
                         </div>
-                        <Badge className={statusColors[order.status]}>
-                          {order.status.replace('-', ' ')}
+                        <Badge className={statusColors[order.status as keyof typeof statusColors] ?? 'bg-gray-100 text-gray-700'}>
+                          {order.status.replace(/-/g, ' ')}
                         </Badge>
                       </div>
 
@@ -211,13 +227,14 @@ export function OrdersPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="preparing">Preparing</SelectItem>
-                              <SelectItem value="ready">Ready for Delivery</SelectItem>
+                              <SelectItem value="ready">Ready for Pickup</SelectItem>
+                              <SelectItem value="out-for-delivery">Out for Delivery</SelectItem>
                               <SelectItem value="delivered">Delivered</SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge className={statusColors[order.status]}>
-                            {order.status}
+                          <Badge className={statusColors[order.status as keyof typeof statusColors] ?? 'bg-gray-100 text-gray-700'}>
+                            {order.status.replace(/-/g, ' ')}
                           </Badge>
                         )}
                       </div>

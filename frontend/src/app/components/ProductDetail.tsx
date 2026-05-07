@@ -35,6 +35,7 @@ interface Product {
 interface Review {
   id: string;
   userId: string;
+  userName: string | null;
   rating: number;
   comment?: string;
   createdAt: string;
@@ -355,11 +356,11 @@ export function ProductDetail() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-400 rounded-full flex items-center justify-center text-white font-bold">
-                            {review.userId.slice(-1).toUpperCase()}
+                            {(review.userName ?? 'G')[0].toUpperCase()}
                           </div>
                           <div>
                             <div className="font-semibold text-gray-900 dark:text-gray-100">
-                              Customer ···{review.userId.slice(-4)}
+                              {review.userName ?? 'Guest'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {new Date(review.createdAt).toLocaleDateString('en-PK', {

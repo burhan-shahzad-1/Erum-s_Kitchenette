@@ -11,7 +11,7 @@ import { Label } from './ui/label';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useCart } from '../context/CartContext';
-import { foodApi } from '../lib/api';
+import { foodApi, ordersApi } from '../lib/api';
 import { ImageWithFallback } from './ImageWithFallback';
 import { useNavigate, Link } from 'react-router';
 import { EditProfileDialog } from './EditProfileDialog';
@@ -48,35 +48,12 @@ interface FavProduct {
 
 interface Order {
   id: string;
-  date: string;
-  items: string[];
-  total: number;
+  createdAt: string;
+  items: { title: string; quantity: number; price: number }[];
+  totalAmount: number;
   status: string;
+  deliveryAddress: string;
 }
-
-const defaultOrders: Order[] = [
-  {
-    id: 'ORD-001',
-    date: '2026-03-05',
-    items: ['Chicken Biryani', 'Gulab Jamun'],
-    total: 398,
-    status: 'Delivered',
-  },
-  {
-    id: 'ORD-002',
-    date: '2026-03-03',
-    items: ['Paneer Tikka Masala', 'Dal Makhani'],
-    total: 438,
-    status: 'Out for Delivery',
-  },
-  {
-    id: 'ORD-003',
-    date: '2026-03-01',
-    items: ['Samosa (6 pcs)', 'Aloo Tikki Chaat'],
-    total: 259,
-    status: 'Delivered',
-  },
-];
 
 export function Profile() {
   const [activeTab, setActiveTab] = useState('orders');
@@ -86,7 +63,8 @@ export function Profile() {
   const navigate = useNavigate();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [orders, setOrders] = useState<Order[]>(defaultOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [newAddr, setNewAddr] = useState({ label: '', line1: '', city: 'Lahore', phone: '' });
@@ -107,6 +85,33 @@ export function Profile() {
         setAllProducts(items);
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setOrdersLoading(true);
+    ordersApi.getAll()
+      .then((res) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raw: any[] = res.data.data ?? [];
+        const mapped: Order[] = raw
+          .map((o) => ({
+            id: o.id,
+            createdAt: o.createdAt,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            items: (o.items ?? []).map((i: any) => ({
+              title: i.title ?? i.name ?? 'Item',
+              quantity: i.quantity,
+              price: i.price,
+            })),
+            totalAmount: o.totalAmount,
+            status: o.status,
+            deliveryAddress: o.deliveryAddress,
+          }))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setOrders(mapped);
+      })
+      .catch(() => setOrders([]))
+      .finally(() => setOrdersLoading(false));
   }, []);
 
   useEffect(() => {
@@ -165,16 +170,31 @@ export function Profile() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Delivered':
-        return 'bg-green-100 text-green-700';
-      case 'Processing':
-        return 'bg-blue-100 text-blue-700';
-      case 'Out for Delivery':
-        return 'bg-yellow-100 text-yellow-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'delivered': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+      case 'preparing':
+      case 'confirmed': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+      case 'ready': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400';
+      case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case 'cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
     }
   };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'Pending',
+      confirmed: 'Confirmed',
+      preparing: 'Preparing',
+      ready: 'Ready for Pickup',
+      delivered: 'Delivered',
+      cancelled: 'Cancelled',
+    };
+    return labels[status] ?? status;
+  };
+
+  const totalSpent = orders
+    .filter((o) => o.status === 'delivered')
+    .reduce((sum, o) => sum + o.totalAmount, 0);
 
   return (
     <div className="min-h-screen py-12">
@@ -240,7 +260,7 @@ export function Profile() {
           </Card>
           <Card className="border-orange-100 text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">Rs. 3200</div>
+              <div className="text-2xl font-bold text-orange-600">Rs. {totalSpent.toLocaleString()}</div>
               <div className="text-sm text-gray-600">Total Spent</div>
             </CardContent>
           </Card>
@@ -274,64 +294,84 @@ export function Profile() {
 
             {/* Orders Tab */}
             <TabsContent value="orders">
-              <div className="space-y-4">
-                {orders.map((order, index) => (
-                  <motion.div
-                    key={order.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
+              {ordersLoading ? (
+                <div className="flex justify-center py-16">
+                  <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : orders.length === 0 ? (
+                <div className="text-center py-16">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">No orders yet</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">Place your first order to see it here.</p>
+                  <Button
+                    onClick={() => navigate('/menu')}
+                    className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
                   >
-                    <Card className="border-orange-100 hover:shadow-lg transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-semibold text-gray-900">
-                                Order {order.id}
-                              </h3>
-                              <Badge className={getStatusColor(order.status)}>
-                                {order.status}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-1">
-                              {new Date(order.date).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                              })}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {order.items.join(', ')}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-lg font-bold text-orange-600">
-                                Rs. {order.total}
+                    Browse Menu
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((order, index) => (
+                    <motion.div
+                      key={order.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="border-orange-100 hover:shadow-lg transition-shadow dark:border-gray-700">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate max-w-[140px]">
+                                  #{order.id.slice(-8).toUpperCase()}
+                                </h3>
+                                <Badge className={getStatusColor(order.status)}>
+                                  {getStatusLabel(order.status)}
+                                </Badge>
                               </div>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                {new Date(order.createdAt).toLocaleDateString('en-PK', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
+                                {order.items.map((i) => `${i.title} ×${i.quantity}`).join(', ')}
+                              </p>
                             </div>
-                            {order.status !== 'Delivered' ? (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => navigate(`/order-tracking/${order.id}`)}
-                                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
-                              >
-                                Track Order
-                              </Button>
-                            ) : (
-                              <Button variant="outline" size="sm">
-                                Reorder
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-4 shrink-0">
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-orange-600 dark:text-orange-500">
+                                  Rs. {order.totalAmount.toLocaleString()}
+                                </div>
+                              </div>
+                              {order.status !== 'delivered' && order.status !== 'cancelled' ? (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => navigate(`/order-tracking/${order.id}`)}
+                                  className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
+                                >
+                                  Track Order
+                                </Button>
+                              ) : (
+                                <span className="text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full border border-green-200 dark:border-green-800">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
-              </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* Favorites Tab */}

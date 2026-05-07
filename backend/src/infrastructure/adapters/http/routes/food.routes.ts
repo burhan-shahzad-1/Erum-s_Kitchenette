@@ -11,6 +11,7 @@ import { CreateReviewUseCase } from '../../../../application/use-cases/review/Cr
 import { GetReviewsUseCase } from '../../../../application/use-cases/review/GetReviewsUseCase';
 import { MongoFoodItemRepository } from '../../db/repositories/MongoFoodItemRepository';
 import { MongoReviewRepository } from '../../db/repositories/MongoReviewRepository';
+import { MongoUserRepository } from '../../db/repositories/MongoUserRepository';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 
@@ -18,6 +19,7 @@ const router = Router();
 
 const foodRepo = new MongoFoodItemRepository();
 const reviewRepo = new MongoReviewRepository();
+const userRepo = new MongoUserRepository();
 
 const foodController = new FoodController(
   new CreateFoodItemUseCase(foodRepo),
@@ -30,6 +32,7 @@ const foodController = new FoodController(
 const reviewController = new ReviewController(
   new CreateReviewUseCase(reviewRepo, foodRepo),
   new GetReviewsUseCase(reviewRepo),
+  userRepo,
 );
 
 const foodRules = [

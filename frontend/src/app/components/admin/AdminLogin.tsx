@@ -118,13 +118,13 @@ export function AdminLogin() {
               {/* Credentials hint */}
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900 rounded-lg p-4">
                 <p className="text-xs text-orange-800 dark:text-orange-300 font-medium mb-2">
-                  Owner account credentials:
+                  Sample credentials (for demo purposes):
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400 break-all">
-                  Email: admin@kitchenette.com
+                  Email: your-admin@email.com
                 </p>
                 <p className="text-xs text-orange-700 dark:text-orange-400">
-                  Password: Admin@1234
+                  Password: ••••••••
                 </p>
               </div>
 
