@@ -73,12 +73,12 @@ export function Checkout() {
     if (addrMode === 'saved' && selectedSavedAddr) {
       deliveryAddress = `${selectedSavedAddr.label}: ${selectedSavedAddr.phone}, ${selectedSavedAddr.line1}${selectedArea ? ', ' + selectedArea : ''}, ${selectedSavedAddr.city}`;
     } else {
-      const firstName = data.get('firstName') as string;
-      const lastName = data.get('lastName') as string;
-      const phone = data.get('phone') as string;
-      const address = data.get('address') as string;
-      const city = data.get('city') as string;
-      const province = data.get('state') as string;
+    const firstName = data.get('firstName') as string;
+    const lastName = data.get('lastName') as string;
+    const phone = data.get('phone') as string;
+    const address = data.get('address') as string;
+    const city = data.get('city') as string;
+    const province = data.get('state') as string;
       deliveryAddress = `${firstName} ${lastName}, ${phone}, ${address}${selectedArea ? ', ' + selectedArea : ''}, ${city}, ${province}`;
     }
 
@@ -256,32 +256,32 @@ export function Checkout() {
                             <div>
                               <Label htmlFor="lastName">Last Name</Label>
                               <Input id="lastName" name="lastName" required placeholder="Ahmed" />
-                            </div>
-                          </div>
-                          <div>
-                            <Label htmlFor="phone">Phone Number</Label>
-                            <Input id="phone" name="phone" type="tel" required placeholder="+92 321 1234567" />
-                          </div>
-                          <div>
-                            <Label htmlFor="address">Street Address</Label>
-                            <Textarea
-                              id="address"
-                              name="address"
-                              required
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input id="phone" name="phone" type="tel" required placeholder="+92 321 1234567" />
+                      </div>
+                      <div>
+                        <Label htmlFor="address">Street Address</Label>
+                        <Textarea
+                          id="address"
+                          name="address"
+                          required
                               placeholder="House no., street, block"
-                              rows={3}
-                            />
-                          </div>
+                          rows={3}
+                        />
+                      </div>
                           <div className="grid sm:grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="city">City</Label>
+                        <div>
+                          <Label htmlFor="city">City</Label>
                               <Input id="city" name="city" required placeholder="Lahore" defaultValue="Lahore" />
-                            </div>
-                            <div>
-                              <Label htmlFor="state">Province</Label>
+                        </div>
+                        <div>
+                          <Label htmlFor="state">Province</Label>
                               <Input id="state" name="state" required placeholder="Punjab" defaultValue="Punjab" />
-                            </div>
-                          </div>
+                        </div>
+                      </div>
                         </>
                       )}
                     </div>
